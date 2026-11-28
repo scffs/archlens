@@ -229,9 +229,10 @@ fn inspect_top_level(node: Node<'_>, source: &str, line_offset: usize, state: &m
     match node.kind() {
         "import_statement" => {
             if let Some(src) = node.child_by_field_name("source") {
-                let text = node_text(node, source).trim_start();
-                let is_type_only =
-                    text.starts_with("import type ") || text.starts_with("import type{");
+                let mut cursor = node.walk();
+                let is_type_only = node
+                    .children(&mut cursor)
+                    .any(|child| child.kind() == "type");
                 let kind = if is_type_only {
                     ImportKind::TypeOnly
                 } else {
@@ -295,7 +296,7 @@ fn collect_specifier_names(node: Node<'_>, source: &str, out: &mut Vec<String>) 
         }
         "identifier" => {
             let s = node_text(node, source).trim();
-            if !s.is_empty() && s != "type" {
+            if !s.is_empty() {
                 out.push(s.to_string());
             }
         }
