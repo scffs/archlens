@@ -2,8 +2,8 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::domain::model::Language;
 use crate::error::{ArchLensError, Result};
+use crate::language::Language;
 
 /// User-defined rule mapping file paths (glob patterns) into a named logical component.
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -2,8 +2,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::domain::model::{FileGraph, ImportKind, Language, SymbolCounts};
-use crate::git::GitAnalysis;
+use crate::domain::model::{FileGraph, GitAnalysis, ImportKind, Language, SymbolCounts};
 
 /// Classification of a component on Robert C. Martin's Abstractness vs Instability chart.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
