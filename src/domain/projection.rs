@@ -9,6 +9,11 @@ use crate::error::Result;
 use crate::paths::build_glob_set;
 
 const MAX_SEPARATE_ROOT_MODULES: usize = 10;
+const COMPONENTS_VIEW: &str = "components";
+const MODULES_VIEW: &str = "modules";
+const PACKAGES_VIEW: &str = "packages";
+const FILES_VIEW: &str = "files";
+const FOLDER_VIEW_PREFIX: &str = "folders-d";
 
 /// A planned grouping of files into logical architectural nodes.
 pub struct ViewProjection {
@@ -17,6 +22,13 @@ pub struct ViewProjection {
     pub description: String,
     /// Mapping `file_path -> group_id`.
     pub file_to_group: HashMap<String, String>,
+}
+
+/// Supplies an additional projection of the analyzed file graph.
+pub trait ViewProvider {
+    /// Produce a view for this graph, or skip it by returning `None`.
+    fn project(&self, graph: &FileGraph, config: &AnalysisConfig)
+    -> Result<Option<ViewProjection>>;
 }
 
 struct CompiledComponentRule {
@@ -38,6 +50,14 @@ pub fn assign_auto_module_ids(graph: &mut FileGraph) {
 pub fn build_projections(
     graph: &FileGraph,
     config: &AnalysisConfig,
+) -> Result<Vec<ViewProjection>> {
+    build_projections_with(graph, config, &[])
+}
+
+pub(crate) fn build_projections_with(
+    graph: &FileGraph,
+    config: &AnalysisConfig,
+    providers: &[&dyn ViewProvider],
 ) -> Result<Vec<ViewProjection>> {
     let mut views = Vec::new();
 
@@ -66,7 +86,29 @@ pub fn build_projections(
     }
 
     views.push(project_files(graph));
+    for provider in providers {
+        if let Some(mut view) = provider.project(graph, config)?
+            && !view.id.is_empty()
+            && !is_builtin_view_id(&view.id)
+            && !views.iter().any(|existing| existing.id == view.id)
+        {
+            for file in &graph.files {
+                view.file_to_group
+                    .entry(file.path.clone())
+                    .or_insert_with(|| file.path.clone());
+            }
+            views.push(view);
+        }
+    }
+
     Ok(views)
+}
+
+fn is_builtin_view_id(id: &str) -> bool {
+    matches!(
+        id,
+        COMPONENTS_VIEW | MODULES_VIEW | PACKAGES_VIEW | FILES_VIEW
+    ) || id.starts_with(FOLDER_VIEW_PREFIX)
 }
 
 fn project_custom_components(graph: &FileGraph, rules: &[ComponentRule]) -> Result<ViewProjection> {
@@ -88,7 +130,7 @@ fn project_custom_components(graph: &FileGraph, rules: &[ComponentRule]) -> Resu
     }
 
     Ok(ViewProjection {
-        id: "components".to_string(),
+        id: COMPONENTS_VIEW.to_string(),
         title: "Components (configured)".to_string(),
         description: "Logical components defined via archlens.toml rules.".to_string(),
         file_to_group,
@@ -103,7 +145,7 @@ fn project_custom_components(graph: &FileGraph, rules: &[ComponentRule]) -> Resu
 fn project_auto_modules(graph: &FileGraph) -> ViewProjection {
     let file_to_group = compute_auto_module_map(&graph.files);
     ViewProjection {
-        id: "modules".to_string(),
+        id: MODULES_VIEW.to_string(),
         title: "Modules (auto)".to_string(),
         description:
             "Language-aware top-level modules (pairs Rust 2018 foo.rs + foo/, separates composition roots)."
@@ -118,10 +160,8 @@ struct PackageLayoutInfo {
 }
 
 fn compute_auto_module_map(files: &[FileNode]) -> HashMap<String, String> {
-    let distinct_packages: BTreeSet<&str> = files
-        .iter()
-        .filter_map(|f| f.package.as_deref())
-        .collect();
+    let distinct_packages: BTreeSet<&str> =
+        files.iter().filter_map(|f| f.package.as_deref()).collect();
     let multi_package = distinct_packages.len() > 1;
 
     // Pass 1: discover subdirectories and loose root files per package.
@@ -167,7 +207,8 @@ fn compute_auto_module_map(files: &[FileNode]) -> HashMap<String, String> {
         } else if info.subdirs.is_empty() {
             // Flat package (e.g. `moex-utils`, `moex-migration`) — keep whole package as one module.
             None
-        } else if info.loose_root_files <= MAX_SEPARATE_ROOT_MODULES || is_entrypoint_stem(file_stem)
+        } else if info.loose_root_files <= MAX_SEPARATE_ROOT_MODULES
+            || is_entrypoint_stem(file_stem)
         {
             // Keep composition roots (`main`, `di`, `lib`) and top-level modules (`errors`, `extractors`) distinct.
             Some(file_stem.to_string())
@@ -190,10 +231,7 @@ fn compute_auto_module_map(files: &[FileNode]) -> HashMap<String, String> {
         } else {
             match sub_module {
                 Some(sub) => sub,
-                None => file
-                    .package
-                    .clone()
-                    .unwrap_or_else(|| "<root>".to_string()),
+                None => file.package.clone().unwrap_or_else(|| "<root>".to_string()),
             }
         };
 
@@ -269,7 +307,7 @@ fn project_packages(graph: &FileGraph) -> Option<ViewProjection> {
     }
 
     Some(ViewProjection {
-        id: "packages".to_string(),
+        id: PACKAGES_VIEW.to_string(),
         title: "Packages / Crates".to_string(),
         description:
             "Manifest-defined packages (Cargo.toml, package.json, pyproject.toml, go.mod)."
@@ -285,7 +323,7 @@ fn project_folders(graph: &FileGraph, depth: usize) -> ViewProjection {
     }
 
     ViewProjection {
-        id: format!("folders-d{depth}"),
+        id: format!("{FOLDER_VIEW_PREFIX}{depth}"),
         title: format!("Folders (depth {depth})"),
         description: format!("Directory hierarchy aggregated up to depth {depth}."),
         file_to_group,
@@ -299,7 +337,7 @@ fn project_files(graph: &FileGraph) -> ViewProjection {
     }
 
     ViewProjection {
-        id: "files".to_string(),
+        id: FILES_VIEW.to_string(),
         title: "Files".to_string(),
         description: "Raw file-level dependency graph.".to_string(),
         file_to_group,
