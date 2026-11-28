@@ -4,24 +4,78 @@ name: Report robustness
   pull_request:
     paths:
       - 'src/report/**'
+      - 'tests/*.test.js'
       - 'tests/report_browser.test.cjs'
+      - '.github/report-mutations.config.mjs'
       - '.github/workflows/report-mutations.yml'
   workflow_dispatch:
+    inputs:
+      scope:
+        description: JavaScript mutation scope
+        type: choice
+        default: core
+        options:
+          - core
+          - all
 
 permissions:
   contents: read
 
 jobs:
-  report:
+  scope:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    outputs:
+      assets: ${{ steps.assets.outputs.list }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: assets
+        env:
+          REPORT_MUTATION_SCOPE: ${{ inputs.scope || 'core' }}
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const assets = process.env.REPORT_MUTATION_SCOPE === "all"
+              ? fs.readdirSync("src/report/assets").filter(name => name.endsWith(".js"))
+              : ["core"];
+            console.log("list=" + JSON.stringify(assets));
+          ' >> "$GITHUB_OUTPUT"
+
+  report:
+    needs: scope
+    runs-on: ubuntu-24.04
+    timeout-minutes: ${{ matrix.asset == 'core' && 10 || 120 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        asset: ${{ fromJSON(needs.scope.outputs.assets) }}
     env:
+      REPORT_MUTATION_ASSET: ${{ matrix.asset }}
       ARCHLENS_BIN: ${{ github.workspace }}/target/debug/archlens
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
       - name: Build the offline report generator
         run: cargo +stable build --locked
       - name: Verify the offline report in Chrome
+        if: matrix.asset == 'core'
         run: node --test tests/report_browser.test.cjs
+      - name: Measure Node coverage of the report assets
+        if: matrix.asset == 'core'
+        run: node --experimental-test-coverage --test-coverage-include='**/src/report/assets/*.js' --test tests/*.test.js
+      - name: Run report mutations
+        env:
+          ARCHLENS_BASELINE_ASSETS: ${{ github.workspace }}/src/report/assets
+        run: npm exec --yes --ignore-scripts --package=@stryker-mutator/core@10.0.0 -- stryker run .github/report-mutations.config.mjs
+      - name: Save the mutation report
+        if: always() && hashFiles('reports/mutation/mutation.json') != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: report-mutations-${{ matrix.asset }}
+          path: reports/mutation/mutation.json
