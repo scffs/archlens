@@ -3,7 +3,7 @@ use std::path::Path;
 
 use crate::domain::model::{ImportKind, RawImport};
 use crate::paths::{join_posix, parent_dir, path_is_under};
-use crate::resolver::{PackageManifest, ProjectIndex, ResolveOutcome, RustCrateInfo};
+use crate::resolver::index::{PackageManifest, ProjectIndex, ResolveOutcome, RustCrateInfo};
 
 /// Parse a `Cargo.toml` manifest if it defines a `[package]`.
 pub fn load_cargo_manifest<S: std::hash::BuildHasher>(

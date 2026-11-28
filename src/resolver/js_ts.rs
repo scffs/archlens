@@ -3,7 +3,7 @@ use std::path::Path;
 use serde_json::Value;
 
 use crate::paths::{join_posix, normalize_rel_path, parent_dir, path_is_under};
-use crate::resolver::{JsPackageInfo, PackageManifest, ProjectIndex, ResolveOutcome, TsConfigInfo};
+use crate::resolver::index::{JsPackageInfo, PackageManifest, ProjectIndex, ResolveOutcome, TsConfigInfo};
 
 const CODE_EXTENSIONS: &[&str] = &["ts", "tsx", "mts", "cts", "js", "jsx", "mjs", "cjs", "vue"];
 
