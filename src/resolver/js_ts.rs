@@ -141,20 +141,12 @@ fn load_tsconfig_chain(
                     target.set_extension("json");
                 }
                 if target.starts_with(root) && target.is_file() {
-                    let mut ref_base: Option<String> = None;
-                    let mut ref_paths: Vec<(String, Vec<String>)> = Vec::new();
-                    load_tsconfig_chain(root, &target, depth + 1, &mut ref_base, &mut ref_paths);
-                    let ref_cfg_dir = target
-                        .parent()
-                        .map_or_else(String::new, |p| normalize_rel_path(root, p));
-                    let effective_ref_base = ref_base.unwrap_or(ref_cfg_dir);
-                    for (pat, repls) in ref_paths {
-                        let normalized_repls: Vec<String> = repls
-                            .into_iter()
-                            .map(|rep| join_posix(&effective_ref_base, &rep))
-                            .collect();
-                        if !paths.iter().any(|(existing, _)| existing == &pat) {
-                            paths.push((pat, normalized_repls));
+                    let mut ref_paths = Vec::new();
+                    load_tsconfig_chain(root, &target, depth + 1, &mut None, &mut ref_paths);
+                    for (pattern, targets) in ref_paths {
+                        // The referenced config has already made its targets repository-relative.
+                        if !paths.iter().any(|(existing, _)| existing == &pattern) {
+                            paths.push((pattern, targets));
                         }
                     }
                 }
