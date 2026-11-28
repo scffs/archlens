@@ -33,3 +33,28 @@ fn report_exports_preserve_data_and_create_parent_directories() {
     let embedded: AnalysisReport = serde_json::from_str(payload).expect("valid embedded JSON");
     assert_eq!(embedded.project_name, roundtrip.project_name);
 }
+
+#[test]
+fn report_loader_accepts_snapshots_without_later_optional_fields() {
+    let temp = TempDir::new().expect("tempdir");
+    let report = empty_report(temp.path());
+    let mut snapshot = serde_json::to_value(&report).expect("serialize report");
+    let fields = snapshot.as_object_mut().expect("snapshot object");
+    for key in [
+        "file_graph",
+        "git",
+        "misplaced_files",
+        "rule_violations",
+        "baseline_diff",
+    ] {
+        fields.remove(key);
+    }
+    let path = temp.path().join("old.json");
+    fs::write(&path, snapshot.to_string()).expect("write old snapshot");
+
+    let loaded = load_report_json(&path).expect("load old snapshot");
+    assert_eq!(loaded.default_view, report.default_view);
+    assert!(loaded.file_graph.files.is_empty());
+    assert!(loaded.rule_violations.is_empty());
+    assert!(loaded.git.is_none());
+}

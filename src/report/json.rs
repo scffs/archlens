@@ -2,6 +2,7 @@ use std::path::Path;
 
 use crate::domain::metrics::AnalysisReport;
 use crate::error::{ArchLensError, Result};
+use crate::report::output::write_report;
 
 /// Serialize an `AnalysisReport` to pretty-printed JSON.
 pub fn to_json_string(report: &AnalysisReport) -> Result<String> {
@@ -10,17 +11,14 @@ pub fn to_json_string(report: &AnalysisReport) -> Result<String> {
 
 /// Write an `AnalysisReport` as JSON to `output_path`.
 pub fn write_json_report(report: &AnalysisReport, output_path: &Path) -> Result<()> {
-    if let Some(parent) = output_path.parent()
-        && !parent.as_os_str().is_empty()
-    {
-        std::fs::create_dir_all(parent).map_err(|source| ArchLensError::Io {
-            path: parent.to_path_buf(),
-            source,
-        })?;
-    }
-    let payload = to_json_string(report)?;
-    std::fs::write(output_path, payload).map_err(|source| ArchLensError::Io {
-        path: output_path.to_path_buf(),
+    write_report(output_path, || to_json_string(report))
+}
+
+/// Load a previously saved `AnalysisReport` JSON snapshot from disk.
+pub fn load_report_json(path: &Path) -> Result<AnalysisReport> {
+    let raw = std::fs::read_to_string(path).map_err(|source| ArchLensError::Io {
+        path: path.to_path_buf(),
         source,
-    })
+    })?;
+    Ok(serde_json::from_str(&raw)?)
 }

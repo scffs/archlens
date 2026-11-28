@@ -1,7 +1,8 @@
 use std::path::Path;
 
 use crate::domain::metrics::AnalysisReport;
-use crate::error::{ArchLensError, Result};
+use crate::error::Result;
+use crate::report::output::write_report;
 
 const HTML_SHELL: &str = include_str!("shell.html");
 const STYLE_CSS: &str = include_str!("assets/style.css");
@@ -48,17 +49,5 @@ pub fn render_html_report(report: &AnalysisReport) -> Result<String> {
 
 /// Write the standalone interactive HTML report to `output_path`.
 pub fn write_html_report(report: &AnalysisReport, output_path: &Path) -> Result<()> {
-    if let Some(parent) = output_path.parent()
-        && !parent.as_os_str().is_empty()
-    {
-        std::fs::create_dir_all(parent).map_err(|source| ArchLensError::Io {
-            path: parent.to_path_buf(),
-            source,
-        })?;
-    }
-    let html = render_html_report(report)?;
-    std::fs::write(output_path, html).map_err(|source| ArchLensError::Io {
-        path: output_path.to_path_buf(),
-        source,
-    })
+    write_report(output_path, || render_html_report(report))
 }
