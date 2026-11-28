@@ -68,6 +68,35 @@ bindings for the built-in parser, resolver, and CLI. The public parser and
 resolver contracts can be used by custom integrations without changing the
 analysis pipeline.
 
+## Development
+
+With [mise](https://mise.jdx.dev/) and [rustup](https://rustup.rs/) installed, run
+these commands from the checkout. On Windows, use Git Bash.
+
+```sh
+mise trust
+mise install
+mise exec -- just setup
+mise exec -- just check
+```
+
+`just setup` installs the stable Rust components and the repository's Git hooks.
+Prek installs both hooks from `.pre-commit-config.yaml`. The pre-commit hook
+checks formatting for Rust changes and runs Bun tests for report changes. The
+pre-push hook runs the local quality gate.
+
+Use `mise exec -- just` to list recipes. To analyze a project with the checkout,
+run `mise exec -- just -- run analyze path/to/project --html report.html`.
+
+To generate a local Rust coverage report, install the coverage tool once, then
+open `target/llvm-cov/html/index.html` after the run.
+
+```sh
+rustup component add --toolchain stable llvm-tools-preview
+cargo +stable install cargo-llvm-cov --locked --version 0.9.1
+mise exec -- just coverage
+```
+
 ## Mutation testing
 
 The Robustness workflow tests mutations of the Rust code changed by a pull

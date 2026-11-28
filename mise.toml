@@ -1,0 +1,6 @@
+[tools]
+prek = "0.5.12"
+just = "1.59.0"
+
+[settings]
+idiomatic_version_file_enable_tools = ["bun"]

@@ -1,0 +1,26 @@
+default_install_hook_types: [pre-commit, pre-push]
+
+repos:
+  - repo: local
+    hooks:
+      - id: rust-format
+        name: Rust formatting
+        entry: mise exec -- just fmt-check
+        language: system
+        files: '\.rs$|(^|/)Cargo\.toml$'
+        pass_filenames: false
+        stages: [pre-commit]
+      - id: report-tests
+        name: Bun report tests
+        entry: mise exec -- just test-report
+        language: system
+        files: '^(\.bun-version|src/report/assets/[^/]+\.js|tests/report_model\.test\.js)$'
+        pass_filenames: false
+        stages: [pre-commit]
+      - id: checks
+        name: Local quality gate
+        entry: mise exec -- just check
+        language: system
+        always_run: true
+        pass_filenames: false
+        stages: [pre-push]
