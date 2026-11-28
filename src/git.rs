@@ -1,11 +1,13 @@
+mod history;
+
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
-use std::process::Command;
 
 use crate::domain::metrics::round4;
 pub use crate::domain::model::{GitAnalysis, TemporalCoupling};
 
 use crate::domain::model::{FileGitMetrics, FileGraph};
+use crate::git::history::{HistoryLog, HistoryRecord};
 
 const MAX_FILES_PER_COCHANGE_COMMIT: usize = 25;
 const MIN_COCHANGE_COMMITS: usize = 3;
@@ -29,39 +31,7 @@ pub fn analyze_git_history(
     lookback_days: u32,
     max_commits: usize,
 ) -> Option<GitAnalysis> {
-    let toplevel = git_toplevel(root)?;
-    let canonical_root = root.canonicalize().ok()?;
-    let canonical_top = Path::new(&toplevel).canonicalize().ok()?;
-    let rel_prefix = canonical_root
-        .strip_prefix(&canonical_top)
-        .ok()
-        .map_or_default(|p| {
-            p.components()
-                .map(|c| c.as_os_str().to_string_lossy())
-                .collect::<Vec<_>>()
-                .join("/")
-        });
-
-    let mut cmd = Command::new("git");
-    cmd.arg("-C")
-        .arg(&canonical_top)
-        .arg("log")
-        .arg("--no-merges")
-        .arg(format!("--since={lookback_days}.days.ago"))
-        .arg(format!("-n{max_commits}"))
-        .arg("--format====COMMIT===%ct\t%aN")
-        .arg("--numstat");
-
-    if !rel_prefix.is_empty() {
-        cmd.arg("--").arg(&rel_prefix);
-    }
-
-    let output = cmd.output().ok()?;
-    if !output.status.success() {
-        return None;
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    let history = HistoryLog::read(root, lookback_days, max_commits)?;
     let known_files: HashSet<&str> = graph.files.iter().map(|f| f.path.as_str()).collect();
     let module_by_file: HashMap<&str, &str> = graph
         .files
@@ -84,71 +54,53 @@ pub fn analyze_git_history(
     let mut cur_author = String::new();
     let mut cur_files: Vec<String> = Vec::new();
 
-    let flush_commit =
-        |files: &mut Vec<String>, cochanges: &mut HashMap<(String, String), usize>| {
-            files.sort();
-            files.dedup();
-            if files.len() >= 2 && files.len() <= MAX_FILES_PER_COCHANGE_COMMIT {
-                for i in 0..files.len() {
-                    for j in (i + 1)..files.len() {
-                        *cochanges
-                            .entry((files[i].clone(), files[j].clone()))
-                            .or_insert(0) += 1;
-                    }
+    let flush_commit = |files: &mut Vec<String>,
+                        cochanges: &mut HashMap<(String, String), usize>| {
+        files.sort();
+        files.dedup();
+        if files.len() >= 2 && files.len() <= MAX_FILES_PER_COCHANGE_COMMIT {
+            for i in 0..files.len() {
+                for j in (i + 1)..files.len() {
+                    *cochanges
+                        .entry((files[i].clone(), files[j].clone()))
+                        .or_insert(0) += 1;
                 }
             }
-            files.clear();
-        };
+        }
+        files.clear();
+    };
 
-    for line in stdout.lines() {
-        if let Some(rest) = line.strip_prefix("===COMMIT===") {
-            flush_commit(&mut cur_files, &mut cochanges);
-            commits_analyzed += 1;
-            let mut parts = rest.splitn(2, '\t');
-            cur_ts = parts
-                .next()
-                .and_then(|s| s.parse::<u64>().ok())
-                .unwrap_or(0);
-            cur_author = parts.next().unwrap_or("unknown").trim().to_string();
-            if cur_ts > latest_ts {
-                latest_ts = cur_ts;
+    for record in history.records() {
+        let (path, added, deleted) = match record {
+            HistoryRecord::Commit { timestamp, author } => {
+                flush_commit(&mut cur_files, &mut cochanges);
+                commits_analyzed += 1;
+                cur_ts = timestamp;
+                cur_author = author.trim().to_string();
+                latest_ts = latest_ts.max(timestamp);
+                continue;
             }
-            continue;
-        }
-
-        if line.trim().is_empty() {
-            continue;
-        }
-
-        let mut cols = line.splitn(3, '\t');
-        let (Some(add_s), Some(del_s), Some(raw_path)) = (cols.next(), cols.next(), cols.next())
-        else {
-            continue;
+            HistoryRecord::File {
+                path,
+                added,
+                deleted,
+            } => (path, added, deleted),
         };
 
-        let normalized_path = normalize_git_numstat_path(raw_path);
-        let rel_to_root = if rel_prefix.is_empty() {
-            normalized_path
-        } else if let Some(stripped) = normalized_path.strip_prefix(&format!("{rel_prefix}/")) {
-            stripped.to_string()
-        } else {
-            continue;
-        };
-
-        if !known_files.contains(rel_to_root.as_str()) {
+        if !known_files.contains(path.as_ref()) {
             continue;
         }
+        let rel_to_root = path.into_owned();
 
-        let added = add_s.parse::<usize>().unwrap_or(0);
-        let deleted = del_s.parse::<usize>().unwrap_or(0);
-
-        let entry = acc.entry(rel_to_root.clone()).or_insert_with(|| FileAccumulator {
-            commits: 0,
-            lines_added: 0,
-            lines_deleted: 0,
-            authors: HashMap::new(),
-            last_ts: 0,
-        });
+        let entry = acc
+            .entry(rel_to_root.clone())
+            .or_insert_with(|| FileAccumulator {
+                commits: 0,
+                lines_added: 0,
+                lines_deleted: 0,
+                authors: HashMap::new(),
+                last_ts: 0,
+            });
         entry.commits += 1;
         entry.lines_added += added;
         entry.lines_deleted += deleted;
@@ -293,39 +245,6 @@ pub fn analyze_git_history(
         active_files,
         temporal_couplings,
     })
-}
-
-fn git_toplevel(root: &Path) -> Option<String> {
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(root)
-        .arg("rev-parse")
-        .arg("--show-toplevel")
-        .output()
-        .ok()?;
-    if !out.status.success() {
-        return None;
-    }
-    let path = String::from_utf8_lossy(&out.stdout).trim().to_string();
-    (!path.is_empty()).then_some(path)
-}
-
-/// Handle Git rename notation like `dir/{old.rs => new.rs}` or `old.rs => new.rs`.
-fn normalize_git_numstat_path(raw: &str) -> String {
-    let trimmed = raw.trim().trim_matches('"');
-    if let (Some(open), Some(close)) = (trimmed.find('{'), trimmed.find('}'))
-        && open < close
-    {
-        let inside = &trimmed[open + 1..close];
-        if let Some((_, new_part)) = inside.split_once(" => ") {
-            let combined = format!("{}{}{}", &trimmed[..open], new_part, &trimmed[close + 1..]);
-            return combined.replace("//", "/");
-        }
-    }
-    if let Some((_, new_part)) = trimmed.split_once(" => ") {
-        return new_part.trim().to_string();
-    }
-    trimmed.to_string()
 }
 
 fn ordered_pair<'a>(a: &'a str, b: &'a str) -> (&'a str, &'a str) {
