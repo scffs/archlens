@@ -56,17 +56,46 @@ jobs:
 
   fuzz:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
+    env:
+      FUZZ_TOOLCHAIN: nightly-2026-11-28
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Install Rust nightly and cargo-fuzz
         run: |
-          rustup toolchain install nightly --profile minimal --component rust-src
+          rustup toolchain install "$FUZZ_TOOLCHAIN" --profile minimal --component rust-src
           cargo +stable install cargo-fuzz --locked --version 0.13.2
-      - name: Run address-sanitized parser fuzz smoke test
+      - name: Run AddressSanitizer fuzz tests
+        shell: bash
         run: |
-          cargo +nightly fetch --manifest-path fuzz/Cargo.toml --locked
-          mkdir -p fuzz/corpus/parse_source
-          cargo +nightly fuzz run parse_source fuzz/corpus/parse_source fuzz/seeds/parse_source -- -max_total_time=30 -max_len=4096 -verbosity=0 -print_final_stats=1
+          cargo +"$FUZZ_TOOLCHAIN" fetch --manifest-path fuzz/Cargo.toml --locked
+          targets=$(cargo +"$FUZZ_TOOLCHAIN" fuzz list)
+          test -n "$targets"
+
+          seconds=30
+          if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
+            seconds=120
+          fi
+
+          status=0
+          while IFS= read -r target; do
+            seeds="fuzz/seeds/$target"
+            if [[ ! -d "$seeds" ]] || [[ -z "$(find "$seeds" -maxdepth 1 -type f -print -quit)" ]]; then
+              printf 'No seeds for %s\n' "$target" >&2
+              status=1
+              continue
+            fi
+            mkdir -p "fuzz/corpus/$target"
+            cargo +"$FUZZ_TOOLCHAIN" fuzz run "$target" "fuzz/corpus/$target" "$seeds" -- "-max_total_time=$seconds" -max_len=4096 -verbosity=0 -print_final_stats=1 || status=1
+          done <<< "$targets"
+          exit "$status"
+      - name: Upload fuzz failure inputs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: archlens-fuzz-reproducers
+          path: fuzz/artifacts/
+          if-no-files-found: ignore
+          retention-days: 14

@@ -20,3 +20,10 @@ path = "fuzz_targets/parse_source.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "analyze_graph"
+path = "fuzz_targets/analyze_graph.rs"
+test = false
+doc = false
+bench = false
