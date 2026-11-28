@@ -136,7 +136,11 @@ pub fn render_diff_summary(diff: &BaselineDiff) -> String {
             diff.new_rule_violations.len()
         );
         for r in diff.new_rule_violations.iter().take(8) {
-            let _ = writeln!(out, "    + [{}] {} -> {}", r.rule_name, r.from_file, r.to_file);
+            let _ = writeln!(
+                out,
+                "    + [{}] {} -> {}",
+                r.rule_name, r.from_file, r.to_file
+            );
         }
     }
     out
@@ -178,7 +182,11 @@ fn render_view_section(out: &mut String, view: &ArchitectureView) {
     ranked.sort_by(|a, b| {
         b.active_pain
             .cmp(&a.active_pain)
-            .then_with(|| b.distance.unwrap_or(-1.0).total_cmp(&a.distance.unwrap_or(-1.0)))
+            .then_with(|| {
+                b.distance
+                    .unwrap_or(-1.0)
+                    .total_cmp(&a.distance.unwrap_or(-1.0))
+            })
             .then_with(|| {
                 (b.afferent_coupling + b.efferent_coupling)
                     .cmp(&(a.afferent_coupling + a.efferent_coupling))

@@ -268,10 +268,7 @@ fn follow_reexport_chain(index: &ProjectIndex, start_file: &str, tail: &[&str]) 
 }
 
 fn resolve_reexport_symbol(index: &ProjectIndex, file: &str, symbol: &str) -> Option<String> {
-    if let Some(target) = index
-        .reexports
-        .get(&(file.to_string(), symbol.to_string()))
-    {
+    if let Some(target) = index.reexports.get(&(file.to_string(), symbol.to_string())) {
         return Some(target.clone());
     }
     if let Some(wildcards) = index.wildcard_reexports.get(file) {

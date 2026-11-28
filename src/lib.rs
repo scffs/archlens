@@ -50,8 +50,7 @@ pub fn analyze_with_plugins(
         .canonicalize()
         .unwrap_or_else(|_| config.root.clone());
 
-    let scanned =
-        scanner::scan_repository_with(config, |ext| plugins.language_for_extension(ext))?;
+    let scanned = scanner::scan_repository_with(config, |ext| plugins.language_for_extension(ext))?;
     let mut parsed_files = Vec::with_capacity(scanned.len());
     for file in scanned {
         let mut parsed = parser::parse_file_with(
@@ -72,7 +71,11 @@ pub fn analyze_with_plugins(
         &parsed_files,
         config.include_mod_decls,
         config.include_tests,
-        |file| plugins.resolver(file).unwrap_or_else(|| resolvers.for_file(file)),
+        |file| {
+            plugins
+                .resolver(file)
+                .unwrap_or_else(|| resolvers.for_file(file))
+        },
     );
 
     let git_analysis = if config.git.enabled {
@@ -122,7 +125,8 @@ fn analyze_file_graph_with_git(
     let rule_violations =
         domain::rules::evaluate_architecture_rules(&file_graph, &config.layers, &config.rules)?;
 
-    let projections = domain::projection::build_projections_with(&file_graph, config, plugins.views())?;
+    let projections =
+        domain::projection::build_projections_with(&file_graph, config, plugins.views())?;
     let views: Vec<ArchitectureView> = projections
         .iter()
         .map(|proj| {
@@ -143,9 +147,7 @@ fn analyze_file_graph_with_git(
 
     let check_violations = views
         .first()
-        .map_or_default(|v| {
-            checks::evaluate_thresholds(v, &config.thresholds, &rule_violations)
-        });
+        .map_or_default(|v| checks::evaluate_thresholds(v, &config.thresholds, &rule_violations));
 
     let mut language_counts: BTreeMap<Language, usize> = BTreeMap::new();
     let mut total_loc = 0usize;

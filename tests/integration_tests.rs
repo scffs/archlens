@@ -102,7 +102,11 @@ mod tests {
         .find(|v| v.id == "components")
         .expect("components view");
 
-    let domain = view.nodes.iter().find(|n| n.id == "domain").expect("domain");
+    let domain = view
+        .nodes
+        .iter()
+        .find(|n| n.id == "domain")
+        .expect("domain");
     assert_eq!(domain.abstractness, Some(1.0));
     assert_eq!(domain.instability, Some(0.0));
     assert_eq!(domain.distance, Some(0.0));
@@ -236,7 +240,11 @@ fn evaluates_architecture_rules_layers_cycle_breaks_and_baseline_diff() {
     let tmp = TempDir::new().expect("tempdir");
     let root = tmp.path();
 
-    write_fixture(root, "package.json", r#"{ "name": "shop", "private": true }"#);
+    write_fixture(
+        root,
+        "package.json",
+        r#"{ "name": "shop", "private": true }"#,
+    );
     write_fixture(
         root,
         "src/domain/order.ts",
@@ -400,7 +408,11 @@ aRunner(sample);
     assert_eq!(core.instability, Some(0.0));
     assert_eq!(core.distance, Some(0.0));
 
-    let pages = modules.nodes.iter().find(|n| n.id == "pages").expect("pages");
+    let pages = modules
+        .nodes
+        .iter()
+        .find(|n| n.id == "pages")
+        .expect("pages");
     assert_eq!(pages.component_fan_out, 2);
     assert_eq!(pages.instability, Some(1.0));
 
@@ -543,9 +555,11 @@ fn resolves_unicode_tsconfig_aliases_with_comments_and_trailing_commas() {
 
     let report = analyze(&config).expect("analyze TypeScript fixture");
     assert!(
-        report.file_graph.edges.iter().any(|edge| {
-            edge.from == "src/app.ts" && edge.to == "src/модели/item.ts"
-        }),
+        report
+            .file_graph
+            .edges
+            .iter()
+            .any(|edge| { edge.from == "src/app.ts" && edge.to == "src/модели/item.ts" }),
         "the Unicode alias should resolve to the original path"
     );
 }
@@ -634,5 +648,11 @@ import './styles.css?inline';
     );
     assert_eq!(entry.unresolved_imports, ["#shared/missing"]);
     assert_eq!(entry.external_imports, ["asset:./styles.css"]);
-    assert!(!report.file_graph.edges.iter().any(|edge| edge.from == "plain/entry.ts"));
+    assert!(
+        !report
+            .file_graph
+            .edges
+            .iter()
+            .any(|edge| edge.from == "plain/entry.ts")
+    );
 }

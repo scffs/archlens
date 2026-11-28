@@ -59,7 +59,13 @@ pub fn compute_baseline_diff(
     let base_rule_keys: BTreeSet<(&str, &str, &str)> = baseline
         .rule_violations
         .iter()
-        .map(|r| (r.rule_name.as_str(), r.from_file.as_str(), r.to_file.as_str()))
+        .map(|r| {
+            (
+                r.rule_name.as_str(),
+                r.from_file.as_str(),
+                r.to_file.as_str(),
+            )
+        })
         .collect();
     let new_rule_violations: Vec<RuleViolation> = current
         .rule_violations
