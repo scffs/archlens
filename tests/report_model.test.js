@@ -96,3 +96,19 @@ test('an explicitly zero SDP tolerance is used in both report graph and simulati
   assert.equal(hierarchy.moduleMetrics.sdpCount, 1);
   assert.equal(edge.isSdpViolation, true);
 });
+
+test('cycles and propagation measure the same directed graph', () => {
+  const ids = ['a', 'b', 'c'];
+  const edges = [
+    { from: 'a', to: 'b' },
+    { from: 'a', to: 'b' },
+    { from: 'b', to: 'a' },
+    { from: 'c', to: 'c' },
+    { from: 'c', to: 'unknown' },
+    { from: 'unknown', to: 'a' },
+  ];
+
+  const { inCycle } = model.computeTarjanScc(ids, edges);
+  assert.deepEqual([...inCycle].sort(), ['a', 'b']);
+  assert.equal(model.computePropagationCost(ids, edges), 5 / 9);
+});
