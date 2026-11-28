@@ -19,11 +19,20 @@ pub fn parse_file(
     language: Language,
     include_tests: bool,
 ) -> Result<ParsedFile> {
+    parse_file_with(abs_path, rel_path, builtin_parser(language), include_tests)
+}
+
+pub(crate) fn parse_file_with(
+    abs_path: &Path,
+    rel_path: &str,
+    parser: &dyn LanguageParser,
+    include_tests: bool,
+) -> Result<ParsedFile> {
     let source = std::fs::read_to_string(abs_path).map_err(|source| ArchLensError::Io {
         path: abs_path.to_path_buf(),
         source,
     })?;
-    parse_source(rel_path, &source, language, include_tests)
+    parser.parse(rel_path, &source, include_tests)
 }
 
 /// Parse an in-memory source string using the appropriate Tree-sitter parser.
@@ -33,19 +42,17 @@ pub fn parse_source(
     language: Language,
     include_tests: bool,
 ) -> Result<ParsedFile> {
+    builtin_parser(language).parse(rel_path, source, include_tests)
+}
+
+pub(crate) fn builtin_parser(language: Language) -> &'static dyn LanguageParser {
+    const JAVASCRIPT: js_ts::JsTsParser = js_ts::JsTsParser::javascript();
     match language {
-        Language::Rust => rust::RustParser.parse(rel_path, source, include_tests),
-        Language::TypeScript => {
-            let is_tsx = Path::new(rel_path)
-                .extension()
-                .is_some_and(|ext| ext.eq_ignore_ascii_case("tsx"));
-            js_ts::JsTsParser::typescript(is_tsx).parse(rel_path, source, include_tests)
-        }
-        Language::JavaScript => {
-            js_ts::JsTsParser::javascript().parse(rel_path, source, include_tests)
-        }
-        Language::Vue => js_ts::VueParser.parse(rel_path, source, include_tests),
-        Language::Python => python::PythonParser.parse(rel_path, source, include_tests),
-        Language::Go => go::GoParser.parse(rel_path, source, include_tests),
+        Language::Rust => &rust::RustParser,
+        Language::TypeScript => &js_ts::TypeScriptParser,
+        Language::JavaScript => &JAVASCRIPT,
+        Language::Vue => &js_ts::VueParser,
+        Language::Python => &python::PythonParser,
+        Language::Go => &go::GoParser,
     }
 }

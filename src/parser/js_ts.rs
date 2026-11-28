@@ -27,7 +27,7 @@ struct JsWalkState {
 }
 
 impl JsTsParser {
-    pub fn javascript() -> Self {
+    pub const fn javascript() -> Self {
         Self {
             dialect: JsDialect::JavaScript,
         }
@@ -85,6 +85,17 @@ impl LanguageParser for JsTsParser {
             cfg_test_mods: Vec::new(),
             implemented_traits: state.implemented_traits,
         })
+    }
+}
+
+pub(super) struct TypeScriptParser;
+
+impl LanguageParser for TypeScriptParser {
+    fn parse(&self, rel_path: &str, source: &str, include_tests: bool) -> Result<ParsedFile> {
+        let is_tsx = Path::new(rel_path)
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("tsx"));
+        JsTsParser::typescript(is_tsx).parse(rel_path, source, include_tests)
     }
 }
 

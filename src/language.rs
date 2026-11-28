@@ -29,7 +29,11 @@ pub enum Language {
 impl Language {
     /// Detect language from a file extension (case-insensitive).
     pub fn from_extension(ext: &str) -> Option<Self> {
-        match ext.to_ascii_lowercase().as_str() {
+        Self::from_normalized_extension(&ext.to_ascii_lowercase())
+    }
+
+    pub(crate) fn from_normalized_extension(ext: &str) -> Option<Self> {
+        match ext {
             "rs" => Some(Self::Rust),
             ext if TYPESCRIPT_EXTENSIONS.contains(&ext) => Some(Self::TypeScript),
             ext if JAVASCRIPT_EXTENSIONS.contains(&ext) => Some(Self::JavaScript),

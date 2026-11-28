@@ -18,6 +18,13 @@ pub struct ScannedFile {
 
 /// Walk `config.root` respecting `.gitignore`, exclude patterns, and language filters.
 pub fn scan_repository(config: &AnalysisConfig) -> Result<Vec<ScannedFile>> {
+    scan_repository_with(config, Language::from_extension)
+}
+
+pub(crate) fn scan_repository_with(
+    config: &AnalysisConfig,
+    detect_language: impl Fn(&str) -> Option<Language>,
+) -> Result<Vec<ScannedFile>> {
     if !config.root.exists() {
         return Err(ArchLensError::InvalidRoot(config.root.clone()));
     }
@@ -43,7 +50,7 @@ pub fn scan_repository(config: &AnalysisConfig) -> Result<Vec<ScannedFile>> {
         let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
             continue;
         };
-        let Some(language) = Language::from_extension(ext) else {
+        let Some(language) = detect_language(ext) else {
             continue;
         };
 
