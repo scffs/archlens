@@ -53,12 +53,10 @@ pub struct LayerRule {
 
 /// Git behavioral history configuration (churn, hotspots, temporal coupling).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct GitConfig {
-    #[serde(default = "default_true")]
     pub enabled: bool,
-    #[serde(default = "default_git_lookback_days")]
     pub lookback_days: u32,
-    #[serde(default = "default_git_max_commits")]
     pub max_commits: usize,
 }
 
@@ -66,8 +64,8 @@ impl Default for GitConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            lookback_days: default_git_lookback_days(),
-            max_commits: default_git_max_commits(),
+            lookback_days: 180,
+            max_commits: 1500,
         }
     }
 }
@@ -93,91 +91,75 @@ pub struct ThresholdConfig {
 
 /// Configuration for running an architectural analysis on a codebase.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct AnalysisConfig {
     /// Root directory to scan.
     #[serde(skip)]
     pub root: PathBuf,
     /// Optional language allow-list. Empty means analyze all supported languages.
-    #[serde(default)]
     pub languages: Vec<Language>,
     /// Extra glob patterns to exclude from scanning (e.g. `**/generated/**`, `**/*.spec.ts`).
-    #[serde(default = "default_excludes")]
     pub exclude: Vec<String>,
     /// Include test files (by default test directories, suffixes, and `#[cfg(test)]` modules are excluded).
-    #[serde(default)]
     pub include_tests: bool,
     /// Include structural Rust `mod foo;` declarations as dependency edges.
-    #[serde(default)]
     pub include_mod_decls: bool,
     /// Minimum difference `I(target) - I(source)` required to flag a Stable Dependencies Principle violation.
-    #[serde(default = "default_sdp_tolerance")]
     pub sdp_tolerance: f64,
     /// Distance threshold separating the Main Sequence band from Zone of Pain / Zone of Uselessness.
-    #[serde(default = "default_main_sequence_band")]
     pub main_sequence_band: f64,
     /// Optional custom logical component rules (e.g. Clean Architecture layers or bounded contexts).
-    #[serde(default)]
     pub components: Vec<ComponentRule>,
     /// Optional strict top-down architecture layers.
-    #[serde(default)]
     pub layers: Vec<LayerRule>,
     /// Optional declarative boundary/facade rules.
-    #[serde(default)]
     pub rules: Vec<ArchitectureRule>,
     /// Folder depths to precompute in the report (e.g. `[1, 2, 3]`).
-    #[serde(default = "default_folder_depths")]
     pub folder_depths: Vec<usize>,
     /// Git behavioral analysis configuration.
-    #[serde(default)]
     pub git: GitConfig,
     /// Threshold checks for CI gating.
-    #[serde(default)]
     pub thresholds: ThresholdConfig,
 }
 
-fn default_true() -> bool {
-    true
-}
-
-fn default_git_lookback_days() -> u32 {
-    180
-}
-
-fn default_git_max_commits() -> usize {
-    1500
-}
-
-fn default_excludes() -> Vec<String> {
-    vec![
-        "**/node_modules/**".to_string(),
-        "**/target/**".to_string(),
-        "**/.git/**".to_string(),
-        "**/dist/**".to_string(),
-        "**/build/**".to_string(),
-        "**/.next/**".to_string(),
-        "**/.nuxt/**".to_string(),
-        "**/.output/**".to_string(),
-        "**/coverage/**".to_string(),
-        "**/playwright-report/**".to_string(),
-        "**/test-results/**".to_string(),
-        "**/__pycache__/**".to_string(),
-        "**/.venv/**".to_string(),
-        "**/venv/**".to_string(),
-        "**/vendor/**".to_string(),
-        "**/.pnpm-store/**".to_string(),
-    ]
-}
-
-fn default_sdp_tolerance() -> f64 {
-    0.05
-}
-
-fn default_main_sequence_band() -> f64 {
-    0.30
-}
-
-fn default_folder_depths() -> Vec<usize> {
-    vec![1, 2, 3]
+impl Default for AnalysisConfig {
+    fn default() -> Self {
+        Self {
+            root: PathBuf::new(),
+            languages: Vec::new(),
+            exclude: [
+                "**/node_modules/**",
+                "**/target/**",
+                "**/.git/**",
+                "**/dist/**",
+                "**/build/**",
+                "**/.next/**",
+                "**/.nuxt/**",
+                "**/.output/**",
+                "**/coverage/**",
+                "**/playwright-report/**",
+                "**/test-results/**",
+                "**/__pycache__/**",
+                "**/.venv/**",
+                "**/venv/**",
+                "**/vendor/**",
+                "**/.pnpm-store/**",
+            ]
+            .into_iter()
+            .map(str::to_owned)
+            .collect(),
+            include_tests: false,
+            include_mod_decls: false,
+            sdp_tolerance: 0.05,
+            main_sequence_band: 0.30,
+            components: Vec::new(),
+            layers: Vec::new(),
+            rules: Vec::new(),
+            folder_depths: vec![1, 2, 3],
+            git: GitConfig::default(),
+            thresholds: ThresholdConfig::default(),
+        }
+    }
 }
 
 impl AnalysisConfig {
@@ -185,18 +167,7 @@ impl AnalysisConfig {
     pub fn new(root: impl Into<PathBuf>) -> Self {
         Self {
             root: root.into(),
-            languages: Vec::new(),
-            exclude: default_excludes(),
-            include_tests: false,
-            include_mod_decls: false,
-            sdp_tolerance: default_sdp_tolerance(),
-            main_sequence_band: default_main_sequence_band(),
-            components: Vec::new(),
-            layers: Vec::new(),
-            rules: Vec::new(),
-            folder_depths: default_folder_depths(),
-            git: GitConfig::default(),
-            thresholds: ThresholdConfig::default(),
+            ..Self::default()
         }
     }
 
