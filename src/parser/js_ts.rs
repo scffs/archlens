@@ -1,12 +1,12 @@
 use std::path::Path;
 
-use tree_sitter::{Language as TsLanguage, Node, Parser};
+use tree_sitter::{Language as TsLanguage, Node};
 
 use crate::domain::model::{
     ImportKind, Language, ParsedFile, RawImport, SymbolCounts, SymbolDecl, SymbolKind, Visibility,
 };
-use crate::error::{ArchLensError, Result};
-use crate::parser::{LanguageParser, count_non_empty_lines, node_text, unquote};
+use crate::error::Result;
+use crate::parser::syntax::{LanguageParser, count_non_empty_lines, node_text, parse_tree, unquote};
 
 #[derive(Debug, Clone, Copy)]
 enum JsDialect {
@@ -52,15 +52,7 @@ impl JsTsParser {
     }
 
     fn parse_script(self, source: &str, line_offset: usize, state: &mut JsWalkState) -> Result<()> {
-        let mut parser = Parser::new();
-        parser
-            .set_language(&self.ts_language())
-            .map_err(|err| ArchLensError::ParserInit {
-                language: "js/ts",
-                message: err.to_string(),
-            })?;
-
-        if let Some(tree) = parser.parse(source, None) {
+        if let Some(tree) = parse_tree(self.ts_language(), "js/ts", source)? {
             walk_program(tree.root_node(), source, line_offset, state);
         }
         Ok(())

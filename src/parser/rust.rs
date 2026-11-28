@@ -1,10 +1,10 @@
-use tree_sitter::{Node, Parser};
+use tree_sitter::Node;
 
 use crate::domain::model::{
     ImportKind, Language, ParsedFile, RawImport, SymbolCounts, SymbolDecl, SymbolKind, Visibility,
 };
-use crate::error::{ArchLensError, Result};
-use crate::parser::{LanguageParser, count_non_empty_lines, node_text};
+use crate::error::Result;
+use crate::parser::syntax::{LanguageParser, count_non_empty_lines, node_text, parse_tree};
 
 pub struct RustParser;
 
@@ -18,14 +18,6 @@ struct RustWalkState {
 
 impl LanguageParser for RustParser {
     fn parse(&self, rel_path: &str, source: &str, include_tests: bool) -> Result<ParsedFile> {
-        let mut parser = Parser::new();
-        parser
-            .set_language(&tree_sitter_rust::LANGUAGE.into())
-            .map_err(|err| ArchLensError::ParserInit {
-                language: "rust",
-                message: err.to_string(),
-            })?;
-
         let mut state = RustWalkState {
             include_tests,
             imports: Vec::new(),
@@ -34,7 +26,7 @@ impl LanguageParser for RustParser {
             implemented_traits: Vec::new(),
         };
 
-        if let Some(tree) = parser.parse(source, None) {
+        if let Some(tree) = parse_tree(tree_sitter_rust::LANGUAGE.into(), "rust", source)? {
             walk_items(tree.root_node(), source, &mut state);
         }
 
