@@ -31,7 +31,10 @@ pub fn evaluate_thresholds(
         for rv in rule_violations.iter().take(10) {
             violations.push(CheckViolation {
                 rule: format!("arch_rule:{}", rv.rule_name),
-                message: format!("{}:{} -> {} ({})", rv.from_file, rv.line, rv.to_file, rv.message),
+                message: format!(
+                    "{}:{} -> {} ({})",
+                    rv.from_file, rv.line, rv.to_file, rv.message
+                ),
             });
         }
         if rule_violations.len() > 10 {

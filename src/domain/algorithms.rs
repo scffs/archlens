@@ -185,7 +185,11 @@ pub fn compute_cycle_break_edges(
     suggestions
 }
 
-fn local_scc_map(k: usize, internal: &[(usize, usize, usize, usize)], active: &[bool]) -> Vec<usize> {
+fn local_scc_map(
+    k: usize,
+    internal: &[(usize, usize, usize, usize)],
+    active: &[bool],
+) -> Vec<usize> {
     let mut g = DiGraph::<usize, ()>::with_capacity(k, internal.len());
     let nodes: Vec<NodeIndex> = (0..k).map(|i| g.add_node(i)).collect();
     for (ei, &(u, v, _, _)) in internal.iter().enumerate() {

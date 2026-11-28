@@ -6,7 +6,9 @@ use crate::domain::model::{
     ImportKind, Language, ParsedFile, RawImport, SymbolCounts, SymbolDecl, SymbolKind, Visibility,
 };
 use crate::error::Result;
-use crate::parser::syntax::{LanguageParser, count_non_empty_lines, node_text, parse_tree, unquote};
+use crate::parser::syntax::{
+    LanguageParser, count_non_empty_lines, node_text, parse_tree, unquote,
+};
 
 #[derive(Debug, Clone, Copy)]
 enum JsDialect {

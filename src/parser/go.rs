@@ -4,7 +4,9 @@ use crate::domain::model::{
     ImportKind, Language, ParsedFile, RawImport, SymbolCounts, SymbolDecl, SymbolKind, Visibility,
 };
 use crate::error::Result;
-use crate::parser::syntax::{LanguageParser, count_non_empty_lines, node_text, parse_tree, unquote};
+use crate::parser::syntax::{
+    LanguageParser, count_non_empty_lines, node_text, parse_tree, unquote,
+};
 
 pub struct GoParser;
 
@@ -14,7 +16,12 @@ impl LanguageParser for GoParser {
         let mut declarations = Vec::new();
 
         if let Some(tree) = parse_tree(tree_sitter_go::LANGUAGE.into(), "go", source)? {
-            walk_go_root(tree.root_node(), source, &mut raw_imports, &mut declarations);
+            walk_go_root(
+                tree.root_node(),
+                source,
+                &mut raw_imports,
+                &mut declarations,
+            );
         }
 
         let symbols = SymbolCounts::from_declarations(&declarations);

@@ -109,9 +109,7 @@ pub fn evaluate_architecture_rules(
                 continue;
             }
             let violated = match rule.kind {
-                RuleKind::Forbid => {
-                    rule.from.is_match(&edge.from) && rule.to.is_match(&edge.to)
-                }
+                RuleKind::Forbid => rule.from.is_match(&edge.from) && rule.to.is_match(&edge.to),
                 RuleKind::AllowOnly => {
                     rule.from.is_match(&edge.from)
                         && !rule.from.is_match(&edge.to)
@@ -138,10 +136,9 @@ pub fn evaluate_architecture_rules(
                         "dependency outside allowed targets for rule '{}'",
                         rule.name
                     ),
-                    RuleKind::PublicApi => format!(
-                        "bypasses public facade required by rule '{}'",
-                        rule.name
-                    ),
+                    RuleKind::PublicApi => {
+                        format!("bypasses public facade required by rule '{}'", rule.name)
+                    }
                 };
                 violations.push(RuleViolation {
                     rule_name: rule.name.clone(),

@@ -87,19 +87,43 @@ fn walk_items(container: Node<'_>, source: &str, state: &mut RustWalkState) {
             "use_declaration" => collect_use_declaration(child, source, &mut state.imports),
             "mod_item" => handle_mod_item(child, source, state),
             "trait_item" => {
-                push_decl(child, source, SymbolKind::Trait, true, &mut state.declarations);
+                push_decl(
+                    child,
+                    source,
+                    SymbolKind::Trait,
+                    true,
+                    &mut state.declarations,
+                );
                 collect_body_references(child, source, &mut state.imports);
             }
             "struct_item" => {
-                push_decl(child, source, SymbolKind::Struct, false, &mut state.declarations);
+                push_decl(
+                    child,
+                    source,
+                    SymbolKind::Struct,
+                    false,
+                    &mut state.declarations,
+                );
                 collect_body_references(child, source, &mut state.imports);
             }
             "enum_item" | "union_item" => {
-                push_decl(child, source, SymbolKind::Enum, false, &mut state.declarations);
+                push_decl(
+                    child,
+                    source,
+                    SymbolKind::Enum,
+                    false,
+                    &mut state.declarations,
+                );
                 collect_body_references(child, source, &mut state.imports);
             }
             "function_item" => {
-                push_decl(child, source, SymbolKind::Function, false, &mut state.declarations);
+                push_decl(
+                    child,
+                    source,
+                    SymbolKind::Function,
+                    false,
+                    &mut state.declarations,
+                );
                 collect_body_references(child, source, &mut state.imports);
             }
             "type_item" => {
