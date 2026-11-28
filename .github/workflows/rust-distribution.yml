@@ -1,0 +1,35 @@
+name: Rust distribution
+
+'on':
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build library documentation with warnings denied
+        run: cargo +stable rustdoc --locked --lib -- -D warnings
+      - name: Package and verify the crate
+        run: cargo +stable package --locked
+
+  portability:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, windows-2025]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Run CLI, configuration, and report contracts
+        run: cargo +stable test --locked --test cli_contracts --test config_contracts --test report_contracts
