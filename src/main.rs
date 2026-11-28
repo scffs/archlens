@@ -315,10 +315,10 @@ fn run_analyze(args: AnalyzeArgs) -> archlens::Result<ExitCode> {
     let mut report = archlens::analyze(&cfg)?;
 
     if let Some(ref view_id) = args.view {
-        if let Some(view) = report.views.iter().find(|v| v.id == *view_id) {
-            report.default_view = view.id.clone();
-            report.check_violations =
-                evaluate_thresholds(view, &cfg.thresholds, &report.rule_violations);
+        if let Some(view) = report.view(view_id) {
+            let violations = evaluate_thresholds(view, &cfg.thresholds, &report.rule_violations);
+            report.default_view.clone_from(view_id);
+            report.check_violations = violations;
         } else {
             let available: Vec<&str> = report.views.iter().map(|v| v.id.as_str()).collect();
             eprintln!(

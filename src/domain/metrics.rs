@@ -297,3 +297,16 @@ pub struct AnalysisReport {
     /// Threshold and architectural rule check failures for CI gating.
     pub check_violations: Vec<CheckViolation>,
 }
+
+impl AnalysisReport {
+    /// Look up a view by ID.
+    pub fn view(&self, view_id: &str) -> Option<&ArchitectureView> {
+        self.views.iter().find(|view| view.id == view_id)
+    }
+
+    /// Use the requested or default view, with the first available view as fallback.
+    pub(crate) fn view_or_first(&self, view_id: Option<&str>) -> Option<&ArchitectureView> {
+        self.view(view_id.unwrap_or(&self.default_view))
+            .or_else(|| self.views.first())
+    }
+}
