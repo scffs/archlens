@@ -14,8 +14,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Install Rust checking components
+        run: rustup component add --toolchain stable rustfmt clippy
+      - name: Check Rust formatting
+        run: cargo +stable fmt --all -- --check
+      - name: Run strict Clippy
+        run: cargo +stable clippy --locked --all-targets -- -D warnings
       - name: Rust tests and architecture checks
         run: cargo +stable test --locked
+      - name: Analyze Archlens with its CLI
+        run: cargo +stable run --locked --quiet -- analyze . --view modules --no-git --fail-on-cycles --quiet
       - name: Check embedded JavaScript syntax
         run: |
           for asset in src/report/assets/*.js
