@@ -7,7 +7,7 @@ use petgraph::graph::{DiGraph, NodeIndex};
 use crate::domain::algorithms::{compute_cycle_break_edges, compute_propagation_and_nccd};
 use crate::domain::metrics::{
     ArchitectureView, ArchitectureZone, CycleGroup, DetailedFileEdge, NodeMetrics, RuleViolation,
-    SdpViolation, ViewEdge, ViewSummary,
+    SdpViolation, ViewEdge, ViewSummary, round3, round4,
 };
 use crate::domain::model::{FileGraph, Language, SymbolCounts};
 use crate::domain::projection::ViewProjection;
@@ -609,12 +609,4 @@ fn compute_summary(nodes: &[NodeMetrics], inputs: SummaryInputs) -> ViewSummary 
         nccd: inputs.nccd,
         rule_violation_count: inputs.rule_violation_count,
     }
-}
-
-fn round3(v: f64) -> f64 {
-    (v * 1_000.0).round() / 1_000.0
-}
-
-fn round4(v: f64) -> f64 {
-    (v * 10_000.0).round() / 10_000.0
 }
