@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>archlens — Анализ архитектуры</title>
+<script>
+(() => {
+  try {
+    const saved = localStorage.getItem('archlens:theme');
+    const theme = saved === 'dark' || saved === 'light'
+      ? saved
+      : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+  } catch (_) {}
+})();
+</script>
+<style>
+__ARCHLENS_STYLE_CSS__
+</style>
+</head>
+<body>
+<div class="t-shell">
+  <!-- TDesign Top Header (t-head-menu) -->
+  <header class="t-header">
+    <div class="t-header-left">
+      <button class="t-btn-icon" id="sidebar-toggle" data-tip="Свернуть или развернуть меню навигации" aria-label="Меню">
+        <svg viewBox="0 0 24 24"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+      </button>
+      <div class="t-brand">
+        <h1 id="project-title">archlens</h1>
+        <span class="meta" id="project-meta"></span>
+      </div>
+    </div>
+    <div class="t-header-ops">
+      <select id="view-select" data-tip="Уровень группировки для метрик, графика баланса и таблицы"></select>
+      <select id="lang-select" data-tip="Фильтр по языку исходников"></select>
+      <input id="search-input" type="search" placeholder="Поиск модуля или файла..." />
+      <button class="t-btn-icon" id="theme-toggle" data-tip="Переключить светлую / тёмную тему" aria-label="Сменить тему">
+        <svg id="theme-icon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="t-body">
+    <!-- TDesign Left Sidebar Navigation (t-aside + t-menu) -->
+    <aside class="t-aside" id="t-aside">
+      <nav class="t-menu-list" aria-label="Разделы отчёта">
+        <button class="t-menu-item tab-btn active" data-tab="graph" data-tip="Интерактивный граф зависимостей с раскрытием модулей и поиском пути">
+          <svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M8.2 7.5 11 15.6M15.8 7.5 13 15.6M8.5 6h7"/></svg>
+          <span class="t-menu-label">Граф зависимостей</span>
+        </button>
+        <button class="t-menu-item tab-btn" data-tab="dsm" data-tip="Иерархическая матрица зависимостей (DSM) с раскрытием до файлов">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
+          <span class="t-menu-label">Матрица связей</span>
+        </button>
+        <button class="t-menu-item tab-btn" data-tab="mainseq" data-tip="График абстрактности и нестабильности (A / I) Роберта Мартина">
+          <svg viewBox="0 0 24 24"><path d="M4 20V4M4 20h16"/><line x1="5" y1="5" x2="19" y2="19" stroke-dasharray="2.5 2.5"/><circle cx="9" cy="14" r="2"/><circle cx="15" cy="9" r="2"/></svg>
+          <span class="t-menu-label">Баланс слоёв</span>
+        </button>
+        <button class="t-menu-item tab-btn" data-tab="treemap" data-tip="Карта кода по размеру файлов, частоте правок в Git и Bus Factor">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="10" height="10" rx="1.5"/><rect x="15" y="3" width="6" height="6" rx="1.5"/><rect x="15" y="11" width="6" height="10" rx="1.5"/><rect x="3" y="15" width="10" height="6" rx="1.5"/></svg>
+          <span class="t-menu-label">Карта кода</span>
+        </button>
+        <button class="t-menu-item tab-btn" data-tab="diagnostics" data-tip="Таблица метрик, циклы с планом разрыва, нарушения слоёв и скрытые связи Git">
+          <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
+          <span class="t-menu-label">Проблемы и Git</span>
+        </button>
+      </nav>
+      <div class="t-aside-footer" id="aside-footer">archlens</div>
+    </aside>
+
+    <!-- Scrollable Main Viewport (t-content) -->
+    <div class="t-content">
+      <!-- Баннер симуляции рефакторинга -->
+      <div class="banner banner-whatif hidden" id="whatif-banner">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <span class="badge b-useless">СИМУЛЯЦИЯ</span>
+          <div class="banner-metrics" id="whatif-stats"></div>
+        </div>
+        <div class="toolbar-group">
+          <button class="sm" id="btn-whatif-export">Скопировать план</button>
+          <button class="sm danger" id="btn-whatif-reset">Сбросить</button>
+        </div>
+      </div>
+
+      <!-- Баннер сравнения с базовой веткой -->
+      <div class="banner banner-diff hidden" id="diff-banner">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <span class="badge b-cyan">СРАВНЕНИЕ С БАЗОЙ</span>
+          <div class="banner-metrics" id="diff-stats"></div>
+        </div>
+      </div>
+
+      <div class="kpis" id="kpi-strip"></div>
+
+      <div class="workspace">
+        <main>
+          <!-- ВКЛАДКА 1: Граф зависимостей -->
+          <section class="panel" id="tab-graph">
+            <div class="panel-toolbar">
+              <div class="toolbar-group">
+                <div class="t-segmented" role="group" aria-label="Режим раскладки">
+                  <button id="layout-sugiyama" class="active" data-tip="Иерархическая раскладка по слоям: точки входа сверху, стабильное ядро снизу">Слои</button>
+                  <button id="layout-ego" data-tip="Выбранный узел в центре: кто его вызывает — слева, от чего он зависит — справа">Вокруг узла</button>
+                  <button id="layout-force" data-tip="Силовая раскладка: тесно связанные модули притягиваются друг к другу">Кластеры</button>
+                </div>
+                <button id="orient-toggle" data-tip="Переключить направление слоёв (сверху вниз / слева направо)">Сверху ↓ Вниз</button>
+                <select id="color-mode" data-tip="По какому признаку красить индикатор на карточках">
+                  <option value="zone">Цвет: статус</option>
+                  <option value="hotspot">Цвет: активность Git</option>
+                  <option value="package">Цвет: пакет / крейт</option>
+                  <option value="louvain">Цвет: кластер связей</option>
+                </select>
+                <select id="edge-filter" data-tip="Фильтр отображаемых зависимостей">
+                  <option value="all">Все связи</option>
+                  <option value="cycles">Только циклы</option>
+                  <option value="sdp">Нарушения слоёв</option>
+                  <option value="dip">Через интерфейсы (DIP)</option>
+                  <option value="rules">Нарушения правил</option>
+                </select>
+              </div>
+              <div class="toolbar-group">
+                <label class="chk" data-tip="Сгруппировать модули в рамки по пакетам / крейтам"><input type="checkbox" id="chk-group-pkg"> Пакеты</label>
+                <label class="chk" data-tip="Показать узлы без связей (миграции, скрипты)"><input type="checkbox" id="chk-show-iso"> Изолированные</label>
+                <label class="chk" data-tip="Наложить пунктирные связи файлов, часто меняющихся в одних коммитах Git"><input type="checkbox" id="chk-temporal"> Связи из Git</label>
+                <button id="graph-expand-cycles" data-tip="Раскрыть модули, участвующие в циклических зависимостях">Раскрыть циклы</button>
+                <button class="t-btn-text" id="graph-collapse-all" data-tip="Свернуть все раскрытые модули обратно">Сбросить</button>
+              </div>
+            </div>
+
+            <div id="graph-canvas-wrap">
+              <canvas id="graph-canvas"></canvas>
+              <div class="graph-hud-top">
+                <div class="hud-chip" id="graph-hud-status"></div>
+                <div class="hud-chip zoom-controls">
+                  <button id="zoom-out" data-tip="Уменьшить масштаб">−</button>
+                  <button id="graph-fit" data-tip="Вписать граф в область">Вписать</button>
+                  <button id="zoom-in" data-tip="Увеличить масштаб">+</button>
+                </div>
+              </div>
+              <div class="graph-overlay">
+                Двойной клик — раскрыть · Shift+клик — путь · Клик по стрелке — детали
+              </div>
+            </div>
+
+            <div class="legend-row">
+              <span class="legend-item" data-tip="Взаимная или кольцевая зависимость между модулями"><span class="swatch-line" style="background:var(--td-error-color)"></span>Цикл</span>
+              <span class="legend-item" data-tip="Стабильный модуль зависит от более изменчивого (нарушение SDP)"><span class="swatch-line" style="background:var(--td-warning-color)"></span>Нарушение слоёв</span>
+              <span class="legend-item" data-tip="Связь через интерфейс / trait или type-only импорт (DIP)"><span class="swatch-line" style="background:var(--td-dip-color)"></span>Интерфейс / DIP</span>
+              <span class="legend-item" data-tip="Кто вызывает подсвеченный узел (входящие зависимости)"><span class="swatch-line" style="background:var(--td-success-color)"></span>Входящие</span>
+              <span class="legend-item" data-tip="От чего зависит подсвеченный узел (исходящие зависимости)"><span class="swatch-line" style="background:var(--td-text-color-primary)"></span>Исходящие</span>
+              <span class="legend-item" data-tip="Файлы регулярно меняются вместе в Git без прямого импорта"><span class="swatch-line" style="background:var(--td-purple-color)"></span>Совместные коммиты</span>
+              <span class="legend-item" data-tip="Точка слева внизу карточки — пакет; метка H — высокая частота правок в Git; «+» — раскрыть">● Пакет · H риск · + раскрыть</span>
+            </div>
+          </section>
+
+          <!-- ВКЛАДКА 2: Иерархическая матрица связей (DSM) -->
+          <section class="panel hidden" id="tab-dsm">
+            <div class="panel-toolbar">
+              <div class="toolbar-group">
+                <span style="font-size:12.5px;color:var(--td-text-color-secondary)">
+                  <b>Строка зависит от столбца.</b> Ниже диагонали — чистый поток; <b style="color:var(--td-error-color)">выше диагонали / в рамке</b> — циклы; <b style="color:var(--td-dip-color)">d</b> — только интерфейсы (DIP).
+                </span>
+              </div>
+              <div class="toolbar-group">
+                <span style="font-size:12px;color:var(--td-text-color-secondary)" id="dsm-note"></span>
+                <button class="sm" id="dsm-collapse-all">Свернуть дерево</button>
+              </div>
+            </div>
+            <div class="dsm-scroll" id="dsm-container"></div>
+          </section>
+
+          <!-- ВКЛАДКА 3: Баланс слоёв (A / I) -->
+          <section class="panel hidden" id="tab-mainseq">
+            <div class="panel-toolbar">
+              <div class="toolbar-group">
+                <label class="chk"><input type="checkbox" id="chk-labels" checked> Подписи</label>
+                <select id="size-mode">
+                  <option value="loc">Размер: строки кода</option>
+                  <option value="files">Размер: число файлов</option>
+                  <option value="coupling">Размер: число связей</option>
+                  <option value="commits">Размер: коммиты Git</option>
+                </select>
+              </div>
+              <span style="font-size:12px;color:var(--td-text-color-secondary)" id="ai-count-hint"></span>
+            </div>
+            <div class="chart-wrap">
+              <svg id="ai-svg" viewBox="0 0 920 580" preserveAspectRatio="xMidYMid meet"></svg>
+            </div>
+            <div class="legend-row">
+              <span class="legend-item" data-tip="Оптимальный баланс между стабильностью и абстрактностью (D ≤ 0.30)"><span class="dot" style="background:var(--td-success-color)"></span>Сбалансирован</span>
+              <span class="legend-item" data-tip="Много входящих, мало абстракций и частые правки в Git"><span class="dot" style="background:var(--td-error-color)"></span>Зона риска / Цикл</span>
+              <span class="legend-item" data-tip="Стабильные конкретные сущности, которые редко меняются"><span class="dot" style="background:var(--td-warning-color)"></span>Стабильное ядро</span>
+              <span class="legend-item" data-tip="Много интерфейсов, но на модуль почти никто не ссылается"><span class="dot" style="background:var(--td-purple-color)"></span>Лишние абстракции</span>
+            </div>
+            <div class="unplotted-strip hidden" id="unplotted-strip">
+              <div class="unplotted-title" id="unplotted-title"></div>
+              <div class="pill-list" id="unplotted-pills"></div>
+            </div>
+          </section>
+
+          <!-- ВКЛАДКА 4: Карта кода (Treemap) -->
+          <section class="panel hidden" id="tab-treemap">
+            <div class="panel-toolbar">
+              <div class="toolbar-group">
+                <select id="treemap-area">
+                  <option value="loc">Площадь: строки кода</option>
+                  <option value="coupling">Площадь: число связей</option>
+                  <option value="commits">Площадь: коммиты Git</option>
+                </select>
+                <select id="treemap-color">
+                  <option value="hotspot">Цвет: горячие точки (размер × коммиты)</option>
+                  <option value="commits">Цвет: частота изменений</option>
+                  <option value="busfactor">Цвет: доля одного автора (Bus Factor)</option>
+                  <option value="louvain">Цвет: кластер связей</option>
+                </select>
+              </div>
+              <span style="font-size:12px;color:var(--td-text-color-secondary)">Нажмите на любой файл, чтобы открыть его связи и символы</span>
+            </div>
+            <svg id="treemap-svg" preserveAspectRatio="none"></svg>
+          </section>
+
+          <!-- ВКЛАДКА 5: Проблемы, таблица метрик и Git -->
+          <section class="panel hidden" id="tab-diagnostics">
+            <div class="data-table-wrap">
+              <table class="metrics-table" id="metrics-table">
+                <thead>
+                  <tr>
+                    <th data-sort="id" data-tip="Название модуля, пакета или файла">Компонент</th>
+                    <th data-sort="file_count" data-tip="Количество исходных файлов">Файлы</th>
+                    <th data-sort="loc" data-tip="Непустые строки кода (LOC)">Строки</th>
+                    <th data-sort="afferent_coupling" data-tip="Ca: сколько внешних файлов зависят от этого модуля">Вх.</th>
+                    <th data-sort="efferent_coupling" data-tip="Ce: от скольких внешних файлов зависит этот модуль">Исх.</th>
+                    <th data-sort="instability" data-tip="Нестабильность I = Ce / (Ca + Ce). 0 — ядро, 1 — верхний слой">I</th>
+                    <th data-sort="abstractness" data-tip="Абстрактность A = публичные трейты/интерфейсы ÷ все публичные сущности">A</th>
+                    <th data-sort="distance" data-tip="Отклонение от баланса D = |A + I − 1|. Чем ближе к 0, тем лучше">D</th>
+                    <th data-sort="commits" data-tip="Коммиты в Git за период">Коммиты</th>
+                    <th data-sort="hotspot_score" data-tip="Индекс горячей точки (0..1): размер × частота коммитов">Риск</th>
+                    <th data-sort="zone" data-tip="Статус на графике баланса с учётом частоты коммитов">Статус</th>
+                    <th data-sort="in_cycle" data-tip="Участвует ли в циклической зависимости">Цикл</th>
+                  </tr>
+                </thead>
+                <tbody id="metrics-tbody"></tbody>
+              </table>
+            </div>
+
+            <div class="diag-grid">
+              <div>
+                <div class="section-hdr no-border" id="cycles-hdr">Циклы и план разрыва</div>
+                <div id="cycles-list"></div>
+
+                <div class="section-hdr" id="temporal-hdr">Скрытые связи из Git (совместные коммиты)</div>
+                <div id="temporal-list"></div>
+              </div>
+              <div>
+                <div class="section-hdr no-border" id="sdp-hdr">Нарушения стабильности и правил</div>
+                <div id="sdp-list"></div>
+
+                <div class="section-hdr" id="misplaced-hdr">Файлы с сильным притяжением к другому модулю</div>
+                <div id="misplaced-list"></div>
+              </div>
+            </div>
+          </section>
+        </main>
+
+        <aside class="panel inspector" id="inspector"></aside>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<script id="archlens-data" type="application/json">__ARCHLENS_REPORT_JSON__</script>
+<script>
+__ARCHLENS_MODEL_JS__
+__ARCHLENS_LAYOUT_JS__
+__ARCHLENS_GRAPH_JS__
+__ARCHLENS_DSM_JS__
+__ARCHLENS_CHARTS_JS__
+__ARCHLENS_INSPECTOR_JS__
+__ARCHLENS_APP_JS__
+</script>
+</body>
+</html>
