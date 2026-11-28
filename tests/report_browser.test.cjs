@@ -46,6 +46,17 @@ function checkReport() {
   }
 }
 
+function replaceEmbeddedAssets(html, originalDirectory) {
+  const currentDirectory = path.join(root, 'src/report/assets');
+  for (const asset of fs.readdirSync(currentDirectory).filter(name => name.endsWith('.js'))) {
+    const original = fs.readFileSync(path.join(originalDirectory, asset), 'utf8');
+    const replacement = fs.readFileSync(path.join(currentDirectory, asset), 'utf8');
+    assert.equal(html.split(original).length, 2, 'expected one embedded copy of ' + asset);
+    html = html.replace(original, () => replacement);
+  }
+  return html;
+}
+
 function readSmokeResult(chrome, report, profile) {
   return new Promise((resolve, reject) => {
     const group = process.platform !== 'win32';
@@ -109,6 +120,13 @@ test('the CLI report works offline across graph, DSM, inspector and What-If', as
     execFileSync(binary, ['analyze', fixture, '--no-git', '--quiet', '--html', output], { timeout: 10000 });
 
     let html = fs.readFileSync(output, 'utf8');
+    // Keep the CLI's shell and snapshot. Replace its exact asset copies only during mutation runs.
+    if (process.env.ARCHLENS_BASELINE_ASSETS) {
+      html = replaceEmbeddedAssets(html, process.env.ARCHLENS_BASELINE_ASSETS);
+      const environment = { __STRYKER_ACTIVE_MUTANT__: process.env.__STRYKER_ACTIVE_MUTANT__ };
+      html = html.replace('<head>', () => '<head><script>globalThis.process = {env:'
+        + JSON.stringify(environment) + '};</script>');
+    }
     html = html.replace('</body>', () => '<script>(' + checkReport + ')()</script></body>');
     fs.writeFileSync(output, html);
 

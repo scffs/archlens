@@ -4,3 +4,6 @@
 !/src/report/shell.html
 *.json
 !fixtures/**/*.json
+/.stryker-tmp/
+/stryker.log
+/reports/mutation/
