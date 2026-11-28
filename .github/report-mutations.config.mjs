@@ -23,7 +23,7 @@ export default {
   testRunner: 'command',
   commandRunner: {
     command: 'node --test --test-isolation=none tests/*.test.js'
-      + (all ? ' tests/report_browser.test.cjs' : ''),
+      + (all ? ' && bun test ./tests/report_browser.test.mjs' : ''),
   },
   // The command runner provides test exit status. CI prints Node coverage separately.
   coverageAnalysis: 'off',
