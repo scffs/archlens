@@ -2,11 +2,11 @@ use std::path::Path;
 
 use serde_json::Value;
 
+use crate::language::js_ts_extensions;
 use crate::paths::{join_posix, normalize_rel_path, parent_dir, path_is_under};
 use crate::resolver::index::{JsPackageInfo, PackageManifest, ProjectIndex, ResolveOutcome, TsConfigInfo};
 
 const NUXT_SHARED_ALIAS: &str = "#shared/";
-const CODE_EXTENSIONS: &[&str] = &["ts", "tsx", "mts", "cts", "js", "jsx", "mjs", "cjs", "vue"];
 
 const NON_CODE_ASSET_EXTENSIONS: &[&str] = &[
     "css", "scss", "sass", "less", "styl", "pcss", "svg", "png", "jpg", "jpeg", "gif", "webp",
@@ -338,14 +338,14 @@ fn try_resolve_file_candidate(index: &ProjectIndex, candidate: &str) -> Option<S
         }
     }
 
-    for ext in CODE_EXTENSIONS {
+    for ext in js_ts_extensions() {
         let with_ext = format!("{candidate}.{ext}");
         if index.known_files.contains(&with_ext) {
             return Some(with_ext);
         }
     }
 
-    for ext in CODE_EXTENSIONS {
+    for ext in js_ts_extensions() {
         let index_file = join_posix(candidate, &format!("index.{ext}"));
         if index.known_files.contains(&index_file) {
             return Some(index_file);
