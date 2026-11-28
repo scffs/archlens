@@ -114,8 +114,7 @@ fn analyze_file_graph_with_git(
         .map_or_else(|| "modules".to_string(), |v| v.id.clone());
 
     let check_violations = views
-        .iter()
-        .find(|v| v.id == default_view)
+        .first()
         .map_or_default(|v| {
             checks::evaluate_thresholds(v, &config.thresholds, &rule_violations)
         });

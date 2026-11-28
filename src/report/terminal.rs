@@ -6,12 +6,7 @@ use crate::domain::metrics::{AnalysisReport, ArchitectureView, ArchitectureZone,
 pub fn render_terminal_summary(report: &AnalysisReport, view_id: Option<&str>) -> String {
     let mut out = String::new();
 
-    let selected_id = view_id.unwrap_or(&report.default_view);
-    let view = report
-        .views
-        .iter()
-        .find(|v| v.id == selected_id)
-        .or_else(|| report.views.first());
+    let view = report.view_or_first(view_id);
 
     let langs: Vec<String> = report
         .language_counts

@@ -9,17 +9,8 @@ pub fn compute_baseline_diff(
     current: &AnalysisReport,
     view_id: Option<&str>,
 ) -> Option<BaselineDiff> {
-    let target_id = view_id.unwrap_or(&current.default_view);
-    let cur_view = current
-        .views
-        .iter()
-        .find(|v| v.id == target_id)
-        .or_else(|| current.views.first())?;
-    let base_view = baseline
-        .views
-        .iter()
-        .find(|v| v.id == cur_view.id)
-        .or_else(|| baseline.views.first())?;
+    let cur_view = current.view_or_first(view_id)?;
+    let base_view = baseline.view_or_first(Some(&cur_view.id))?;
 
     let base_cycles: BTreeSet<Vec<String>> = base_view
         .cycles
