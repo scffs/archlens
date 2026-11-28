@@ -1,27 +1,19 @@
-use tree_sitter::{Node, Parser};
+use tree_sitter::Node;
 
 use crate::domain::model::{
     ImportKind, Language, ParsedFile, RawImport, SymbolCounts, SymbolDecl, SymbolKind, Visibility,
 };
-use crate::error::{ArchLensError, Result};
-use crate::parser::{LanguageParser, count_non_empty_lines, node_text, unquote};
+use crate::error::Result;
+use crate::parser::syntax::{LanguageParser, count_non_empty_lines, node_text, parse_tree, unquote};
 
 pub struct GoParser;
 
 impl LanguageParser for GoParser {
     fn parse(&self, rel_path: &str, source: &str, _include_tests: bool) -> Result<ParsedFile> {
-        let mut parser = Parser::new();
-        parser
-            .set_language(&tree_sitter_go::LANGUAGE.into())
-            .map_err(|err| ArchLensError::ParserInit {
-                language: "go",
-                message: err.to_string(),
-            })?;
-
         let mut raw_imports = Vec::new();
         let mut declarations = Vec::new();
 
-        if let Some(tree) = parser.parse(source, None) {
+        if let Some(tree) = parse_tree(tree_sitter_go::LANGUAGE.into(), "go", source)? {
             walk_go_root(tree.root_node(), source, &mut raw_imports, &mut declarations);
         }
 

@@ -1,27 +1,19 @@
-use tree_sitter::{Node, Parser};
+use tree_sitter::Node;
 
 use crate::domain::model::{
     ImportKind, Language, ParsedFile, RawImport, SymbolCounts, SymbolDecl, SymbolKind, Visibility,
 };
-use crate::error::{ArchLensError, Result};
-use crate::parser::{LanguageParser, count_non_empty_lines, node_text};
+use crate::error::Result;
+use crate::parser::syntax::{LanguageParser, count_non_empty_lines, node_text, parse_tree};
 
 pub struct PythonParser;
 
 impl LanguageParser for PythonParser {
     fn parse(&self, rel_path: &str, source: &str, _include_tests: bool) -> Result<ParsedFile> {
-        let mut parser = Parser::new();
-        parser
-            .set_language(&tree_sitter_python::LANGUAGE.into())
-            .map_err(|err| ArchLensError::ParserInit {
-                language: "python",
-                message: err.to_string(),
-            })?;
-
         let mut raw_imports = Vec::new();
         let mut declarations = Vec::new();
 
-        if let Some(tree) = parser.parse(source, None) {
+        if let Some(tree) = parse_tree(tree_sitter_python::LANGUAGE.into(), "python", source)? {
             let root = tree.root_node();
             collect_top_level_symbols(root, source, &mut declarations);
             collect_all_imports(root, source, &mut raw_imports);
