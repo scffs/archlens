@@ -107,3 +107,30 @@ fn go_parser_preserves_imports_declarations_and_one_based_lines() {
         ]
     );
 }
+
+#[test]
+fn javascript_parser_reports_literal_dynamic_dependencies_with_source_lines() {
+    let source = r"async function boot(theme, load) {
+    await import(`./panel.js`);
+    const helpers = require('./helpers.cjs');
+    await import(`./themes/${theme}.js`);
+    await import(theme);
+    load('./preview.js');
+    return helpers;
+}
+";
+    let parsed = parse_source("src/boot.cjs", source, Language::JavaScript, false).unwrap();
+    let imports: Vec<_> = parsed
+        .raw_imports
+        .iter()
+        .map(|import| (import.specifier.as_str(), import.kind, import.line))
+        .collect();
+
+    assert_eq!(
+        imports,
+        [
+            ("./panel.js", ImportKind::Dynamic, 2),
+            ("./helpers.cjs", ImportKind::Dynamic, 3),
+        ]
+    );
+}
