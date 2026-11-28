@@ -1,15 +1,21 @@
 use std::fs;
 use std::path::Path;
 use std::process::Command;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use archlens::{AnalysisConfig, analyze};
 use tempfile::TempDir;
 
 fn git(root: &Path, args: &[&str]) {
+    git_with_env(root, args, &[]);
+}
+
+fn git_with_env(root: &Path, args: &[&str], env: &[(&str, &str)]) {
     let output = Command::new("git")
         .current_dir(root)
         .env("GIT_CONFIG_NOSYSTEM", "1")
         .env("GIT_CONFIG_GLOBAL", root.join(".git/nonexistent-config"))
+        .envs(env.iter().copied())
         .arg("--literal-pathspecs")
         .args([
             "-c",
@@ -161,4 +167,78 @@ fn git_history_uses_literal_paths_and_attributes_renames_to_the_destination() {
         );
         assert_eq!(metrics.lines_deleted, 0, "{:?}", file.path);
     }
+}
+
+#[test]
+fn git_hotspot_weights_incoming_and_outgoing_dependencies_and_recent_history() {
+    let temp = TempDir::new().expect("temporary repository");
+    let root = temp.path();
+    git(root, &["init", "--quiet"]);
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time")
+        .as_secs();
+    let commit = |days_ago: u64| {
+        let timestamp = now - days_ago * 86_400;
+        let date = format!("@{timestamp} +0000");
+        git(root, &["add", "--", "."]);
+        git_with_env(
+            root,
+            &["commit", "--quiet", "-m", "update fixture"],
+            &[("GIT_COMMITTER_DATE", &date), ("GIT_AUTHOR_DATE", &date)],
+        );
+    };
+    fs::write(root.join("core.ts"), "export const value = 1;\n").expect("core");
+    fs::write(root.join("plain.ts"), "export const cache = 1;\n").expect("plain");
+    let worker = root.join("worker.ts");
+    fs::write(
+        &worker,
+        "import { value } from './core';\nexport const count = value;\n",
+    )
+    .expect("worker");
+    commit(3);
+    fs::write(
+        &worker,
+        "import { value } from './core';\nexport const count = value + 1;\n",
+    )
+    .expect("update worker");
+    commit(2);
+    fs::write(root.join("plain.ts"), "export const cache = 2;\n").expect("update plain");
+    commit(1);
+
+    let report = analyze(&AnalysisConfig::new(root)).expect("analyze Git hotspots");
+    for (path, score, age) in [
+        ("worker.ts", 1.0, 1),
+        ("core.ts", 0.3981, 2),
+        ("plain.ts", 0.5486, 0),
+    ] {
+        let metrics = report
+            .file_graph
+            .files
+            .iter()
+            .find(|file| file.path == path)
+            .and_then(|file| file.git.as_ref())
+            .expect("file history");
+        assert!(
+            (metrics.hotspot_score - score).abs() < 1e-9,
+            "{path}: {metrics:?}"
+        );
+        assert_eq!(metrics.days_since_last_change, age, "{path}");
+    }
+}
+
+#[test]
+fn git_hotspot_is_zero_for_a_repository_with_only_empty_source_files() {
+    let temp = TempDir::new().expect("temporary repository");
+    let root = temp.path();
+    git(root, &["init", "--quiet"]);
+    fs::write(root.join("empty.ts"), "").expect("empty source");
+    git(root, &["add", "--", "empty.ts"]);
+    git(root, &["commit", "--quiet", "-m", "add empty source"]);
+
+    let report = analyze(&AnalysisConfig::new(root)).expect("analyze empty source");
+    let file = report.file_graph.files.first().expect("empty source file");
+    let metrics = file.git.as_ref().expect("file history");
+    assert_eq!(metrics.commits, 1);
+    assert!(metrics.hotspot_score.abs() < f64::EPSILON, "{metrics:?}");
 }
