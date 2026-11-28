@@ -1,11 +1,11 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use globset::{Glob, GlobSet, GlobSetBuilder};
 use ignore::WalkBuilder;
 
 use crate::config::AnalysisConfig;
 use crate::domain::model::Language;
 use crate::error::{ArchLensError, Result};
+pub use crate::paths::{build_glob_set, normalize_rel_path};
 
 /// A discovered source file ready for parsing.
 #[derive(Debug, Clone)]
@@ -69,33 +69,6 @@ pub fn scan_repository(config: &AnalysisConfig) -> Result<Vec<ScannedFile>> {
 
     files.sort_by(|a, b| a.rel_path.cmp(&b.rel_path));
     Ok(files)
-}
-
-/// Build a compiled `GlobSet` from pattern strings.
-pub fn build_glob_set(patterns: &[String]) -> Result<GlobSet> {
-    let mut builder = GlobSetBuilder::new();
-    for pattern in patterns {
-        let glob = Glob::new(pattern).map_err(|source| ArchLensError::InvalidGlob {
-            pattern: pattern.clone(),
-            source,
-        })?;
-        builder.add(glob);
-    }
-    builder
-        .build()
-        .map_err(|source| ArchLensError::InvalidGlob {
-            pattern: patterns.join(", "),
-            source,
-        })
-}
-
-/// Convert an absolute path under `root` to a normalized POSIX relative path.
-pub fn normalize_rel_path(root: &Path, path: &Path) -> String {
-    let rel = path.strip_prefix(root).unwrap_or(path);
-    rel.components()
-        .map(|c| c.as_os_str().to_string_lossy())
-        .collect::<Vec<_>>()
-        .join("/")
 }
 
 /// Heuristic check for dedicated test files and test directories across supported languages.
