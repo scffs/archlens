@@ -5,7 +5,8 @@ name: Report robustness
     paths:
       - 'src/report/**'
       - 'tests/*.test.js'
-      - 'tests/report_browser.test.cjs'
+      - 'tests/report_browser.test.mjs'
+      - '.bun-version'
       - '.github/report-mutations.config.mjs'
       - '.github/workflows/report-mutations.yml'
   workflow_dispatch:
@@ -61,11 +62,14 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
       - name: Build the offline report generator
         run: cargo +stable build --locked
       - name: Verify the offline report in Chrome
         if: matrix.asset == 'core'
-        run: node --test tests/report_browser.test.cjs
+        run: bun test ./tests/report_browser.test.mjs
       - name: Measure Node coverage of the report assets
         if: matrix.asset == 'core'
         run: node --experimental-test-coverage --test-coverage-include='**/src/report/assets/*.js' --test tests/*.test.js
