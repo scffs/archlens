@@ -5,18 +5,20 @@ use ignore::WalkBuilder;
 
 use crate::domain::model::{ImportKind, Language, ParsedFile};
 use crate::paths::{join_posix, normalize_rel_path, parent_dir};
-use crate::resolver::index::{ProjectIndex, ResolveOutcome};
+use crate::resolver::dispatch::builtin_resolver;
+use crate::resolver::index::{ImportResolver, ProjectIndex, ResolveOutcome};
 use crate::resolver::{go, js_ts, python, rust};
 
 impl ProjectIndex {
     /// Build a repository index from `root` and the list of parsed source files.
     pub fn build(root: &Path, parsed_files: &[ParsedFile]) -> Self {
-        Self::build_for_files(root, parsed_files.iter())
+        Self::build_for_files(root, parsed_files.iter(), builtin_resolver)
     }
 
-    pub(super) fn build_for_files<'a>(
+    pub(super) fn build_for_files<'a, 'r>(
         root: &Path,
         parsed_files: impl Iterator<Item = &'a ParsedFile> + Clone,
+        resolver_for: impl Fn(&ParsedFile) -> &'r dyn ImportResolver,
     ) -> Self {
         let mut index = Self::default();
 
@@ -149,12 +151,16 @@ impl ProjectIndex {
         index.python_roots = py_roots.into_iter().collect();
 
         // Populate re-export index for Rust (`pub use`) and TS/JS (`export ... from`).
-        index.build_reexport_table(parsed_files);
+        index.build_reexport_table(parsed_files, resolver_for);
 
         index
     }
 
-    fn build_reexport_table<'a>(&mut self, parsed_files: impl Iterator<Item = &'a ParsedFile>) {
+    fn build_reexport_table<'a, 'r>(
+        &mut self,
+        parsed_files: impl Iterator<Item = &'a ParsedFile>,
+        resolver_for: impl Fn(&ParsedFile) -> &'r dyn ImportResolver,
+    ) {
         let mut direct = Vec::new();
         let mut wildcards = Vec::new();
 
@@ -163,15 +169,10 @@ impl ProjectIndex {
                 if raw.kind != ImportKind::ReExport {
                     continue;
                 }
-                let outcome = match pf.language {
-                    Language::Rust => rust::resolve_rust_import_direct(self, &pf.path, raw),
-                    Language::TypeScript | Language::JavaScript | Language::Vue => {
-                        js_ts::resolve_js_ts_import(self, &pf.path, &raw.specifier)
-                    }
-                    _ => continue,
-                };
-                if let ResolveOutcome::Internal(target) = outcome
+                let outcome = resolver_for(pf).resolve_reexport(self, &pf.path, raw);
+                if let Some(ResolveOutcome::Internal(target)) = outcome
                     && target != pf.path
+                    && self.known_files.contains(&target)
                 {
                     if raw.specifier.ends_with("::*") || raw.symbols.is_empty() {
                         wildcards.push((pf.path.clone(), target));

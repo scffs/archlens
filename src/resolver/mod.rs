@@ -3,17 +3,19 @@ pub mod js_ts;
 pub mod python;
 pub mod rust;
 
+mod dispatch;
 mod index;
 mod index_builder;
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::Path;
 
+pub(crate) use self::dispatch::builtin_resolver;
 pub use self::index::{
-    GoModuleInfo, JsPackageInfo, PackageManifest, ProjectIndex, ResolveOutcome, RustCrateInfo,
+    GoModuleInfo, ImportResolver, JsPackageInfo, PackageManifest, ProjectIndex, ResolveOutcome, RustCrateInfo,
     TsConfigInfo,
 };
-use crate::domain::model::{FileEdge, FileGraph, FileNode, ImportKind, Language, ParsedFile};
+use crate::domain::model::{FileEdge, FileGraph, FileNode, ImportKind, ParsedFile};
 use crate::domain::projection::assign_auto_module_ids;
 pub use crate::paths::{join_posix, normalize_posix, parent_dir, path_is_under};
 
@@ -30,32 +32,36 @@ pub fn resolve_file_graph(
     include_mod_decls: bool,
     include_tests: bool,
 ) -> FileGraph {
-    // Filter out Rust files declared solely under `#[cfg(test)] mod <name>;` when excluding tests.
+    resolve_file_graph_with(root, parsed_files, include_mod_decls, include_tests, builtin_resolver)
+}
+
+pub(crate) fn resolve_file_graph_with<'r>(
+    root: &Path,
+    parsed_files: &[ParsedFile],
+    include_mod_decls: bool,
+    include_tests: bool,
+    resolver_for: impl Fn(&ParsedFile) -> &'r dyn ImportResolver,
+) -> FileGraph {
     let active_files: Vec<&ParsedFile> = if include_tests {
         parsed_files.iter().collect()
     } else {
-        let all_paths: HashSet<String> = parsed_files.iter().map(|p| p.path.clone()).collect();
-        let mut excluded_test_paths = HashSet::new();
-        for pf in parsed_files {
-            if pf.language == Language::Rust {
-                for mod_name in &pf.cfg_test_mods {
-                    for hit in rust::collect_cfg_test_mod_files(&all_paths, &pf.path, mod_name) {
-                        excluded_test_paths.insert(hit);
-                    }
-                }
-            }
-        }
+        let all_paths: HashSet<String> = parsed_files.iter().map(|file| file.path.clone()).collect();
+        let excluded_test_paths: HashSet<String> = parsed_files
+            .iter()
+            .flat_map(|file| resolver_for(file).test_only_files(&all_paths, file))
+            .collect();
         parsed_files
             .iter()
-            .filter(|pf| !excluded_test_paths.contains(&pf.path))
+            .filter(|file| !excluded_test_paths.contains(&file.path))
             .collect()
     };
 
-    let index = ProjectIndex::build_for_files(root, active_files.iter().copied());
+    let index = ProjectIndex::build_for_files(root, active_files.iter().copied(), &resolver_for);
     let mut files = Vec::with_capacity(active_files.len());
     let mut edges = Vec::new();
 
     for pf in active_files {
+        let resolver = resolver_for(pf);
         let pkg = index.enclosing_package(&pf.path);
         let impl_trait_names: HashSet<&str> = pf
             .implemented_traits
@@ -71,16 +77,12 @@ pub fn resolve_file_graph(
             if raw.kind == ImportKind::ModuleDecl && !include_mod_decls {
                 continue;
             }
-            let outcome = match pf.language {
-                Language::Rust => rust::resolve_rust_import(&index, &pf.path, raw),
-                Language::TypeScript | Language::JavaScript | Language::Vue => {
-                    js_ts::resolve_js_ts_import(&index, &pf.path, &raw.specifier)
-                }
-                Language::Python => python::resolve_python_import(&index, &pf.path, &raw.specifier),
-                Language::Go => go::resolve_go_import(&index, &raw.specifier),
-            };
+            let outcome = resolver.resolve(&index, &pf.path, raw);
 
             match outcome {
+                ResolveOutcome::Internal(target) if !index.known_files.contains(&target) => {
+                    unresolved_set.insert(raw.specifier.clone());
+                }
                 ResolveOutcome::Internal(target) => {
                     if target != pf.path {
                         let entry = target_acc.entry(target).or_insert_with(|| EdgeAccumulator {

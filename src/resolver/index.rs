@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
+use crate::domain::model::{ParsedFile, RawImport};
 use crate::paths::path_is_under;
 
 /// Result of attempting to resolve one raw import specifier from a source file.
@@ -11,6 +12,29 @@ pub enum ResolveOutcome {
     External(String),
     /// Looks internal/local, but no matching scanned file was found.
     Unresolved(String),
+}
+
+/// Converts imports from parsed source into internal or external dependency facts.
+pub trait ImportResolver {
+    fn resolve(&self, index: &ProjectIndex, from: &str, import: &RawImport) -> ResolveOutcome;
+
+    /// Resolve a re-export directly while the index's re-export table is being built.
+    ///
+    /// Return `None` when the language has no re-export indexing. The index has
+    /// file and manifest information at this stage, but no computed re-exports.
+    fn resolve_reexport(
+        &self,
+        index: &ProjectIndex,
+        from: &str,
+        import: &RawImport,
+    ) -> Option<ResolveOutcome> {
+        Some(self.resolve(index, from, import))
+    }
+
+    /// File paths belonging exclusively to test declarations in this source.
+    fn test_only_files(&self, _paths: &HashSet<String>, _file: &ParsedFile) -> Vec<String> {
+        Vec::new()
+    }
 }
 
 /// Discovered package manifest metadata used for both import resolution and package-level views.
