@@ -215,3 +215,34 @@ test('generated What-If edits retain exactly the visible imports and cuts', () =
     }
   }
 });
+
+test('reports isolated nodes, empty modules and the Main Sequence boundary', () => {
+  const node = { abstractCount: 1, concreteCount: 3, hotspot: 1 };
+  expect(model.nodeMetrics(node, 0, 0, 0.25)).toMatchObject({
+    abstractness: 0.25, instability: null, distance: null,
+    zone: 'isolated', activePain: false, inCycle: false,
+  });
+  expect(model.nodeMetrics({ abstractCount: 0, concreteCount: 0, hotspot: 1 }, 1, 1, 0.25))
+    .toMatchObject({
+      abstractness: null, instability: 0.5, distance: null,
+      zone: 'no_entities', activePain: false,
+    });
+  expect(model.nodeMetrics(node, 1, 1, 0.25)).toMatchObject({
+    abstractness: 0.25, instability: 0.5, distance: 0.25,
+    zone: 'main_sequence', activePain: false, inCycle: false,
+  });
+});
+
+test('marks active pain at the hotspot boundary only inside the Zone of Pain', () => {
+  const node = { abstractCount: 1, concreteCount: 3, hotspot: 0.30 };
+  expect(model.nodeMetrics(node, 3, 1, 0.25, true)).toMatchObject({
+    abstractness: 0.25, instability: 0.25, distance: 0.5,
+    zone: 'zone_of_pain', activePain: true, inCycle: true,
+  });
+  expect(model.nodeMetrics({ ...node, hotspot: 0.29 }, 3, 1, 0.25).activePain).toBe(false);
+  expect(model.nodeMetrics({ abstractCount: 3, concreteCount: 1, hotspot: 1 }, 1, 3, 0.25))
+    .toMatchObject({
+      abstractness: 0.75, instability: 0.75, distance: 0.5,
+      zone: 'zone_of_uselessness', activePain: false,
+    });
+});
