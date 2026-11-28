@@ -1,6 +1,7 @@
 use std::path::Path;
 
-use crate::resolver::{PackageManifest, ProjectIndex, ResolveOutcome, join_posix, parent_dir};
+use crate::paths::{join_posix, parent_dir};
+use crate::resolver::{PackageManifest, ProjectIndex, ResolveOutcome};
 
 /// Load project name from a `pyproject.toml` manifest.
 pub fn load_pyproject(abs_path: &Path, dir: &str) -> Option<PackageManifest> {

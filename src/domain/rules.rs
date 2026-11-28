@@ -6,7 +6,7 @@ use crate::config::{ArchitectureRule, LayerRule, RuleKind};
 use crate::domain::metrics::RuleViolation;
 use crate::domain::model::FileGraph;
 use crate::error::Result;
-use crate::scanner::build_glob_set;
+use crate::paths::build_glob_set;
 
 struct CompiledRule {
     name: String,

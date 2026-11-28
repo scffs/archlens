@@ -1,11 +1,12 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::Path;
 
-use globset::{Glob, GlobSet, GlobSetBuilder};
+use globset::GlobSet;
 
 use crate::config::{AnalysisConfig, ComponentRule};
 use crate::domain::model::{FileGraph, FileNode};
-use crate::error::{ArchLensError, Result};
+use crate::error::Result;
+use crate::paths::build_glob_set;
 
 const MAX_SEPARATE_ROOT_MODULES: usize = 10;
 
@@ -73,7 +74,7 @@ fn project_custom_components(graph: &FileGraph, rules: &[ComponentRule]) -> Resu
     for rule in rules {
         compiled.push(CompiledComponentRule {
             name: rule.name.clone(),
-            matcher: compile_glob_set(&rule.patterns)?,
+            matcher: build_glob_set(&rule.patterns)?,
         });
     }
 
@@ -303,23 +304,6 @@ fn project_files(graph: &FileGraph) -> ViewProjection {
         description: "Raw file-level dependency graph.".to_string(),
         file_to_group,
     }
-}
-
-fn compile_glob_set(patterns: &[String]) -> Result<GlobSet> {
-    let mut builder = GlobSetBuilder::new();
-    for pattern in patterns {
-        let glob = Glob::new(pattern).map_err(|source| ArchLensError::InvalidGlob {
-            pattern: pattern.clone(),
-            source,
-        })?;
-        builder.add(glob);
-    }
-    builder
-        .build()
-        .map_err(|source| ArchLensError::InvalidGlob {
-            pattern: patterns.join(", "),
-            source,
-        })
 }
 
 fn folder_at_depth(rel_path: &str, depth: usize) -> String {

@@ -10,7 +10,8 @@ use ignore::WalkBuilder;
 
 use crate::domain::model::{FileEdge, FileGraph, FileNode, ImportKind, Language, ParsedFile};
 use crate::domain::projection::assign_auto_module_ids;
-use crate::scanner::normalize_rel_path;
+use crate::paths::normalize_rel_path;
+pub use crate::paths::{join_posix, normalize_posix, parent_dir, path_is_under};
 
 /// Result of attempting to resolve one raw import specifier from a source file.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -455,48 +456,4 @@ pub fn resolve_file_graph(
     let mut graph = FileGraph { files, edges };
     assign_auto_module_ids(&mut graph);
     graph
-}
-
-/// Parent directory of a POSIX relative path (empty string for top-level files).
-pub fn parent_dir(rel_path: &str) -> String {
-    match rel_path.rsplit_once('/') {
-        Some((dir, _)) => dir.to_string(),
-        None => String::new(),
-    }
-}
-
-/// True if `rel_path` lives inside `dir` (empty `dir` matches everything).
-pub fn path_is_under(rel_path: &str, dir: &str) -> bool {
-    if dir.is_empty() {
-        return true;
-    }
-    rel_path == dir
-        || (rel_path.starts_with(dir) && rel_path.as_bytes().get(dir.len()) == Some(&b'/'))
-}
-
-/// Join and normalize two POSIX relative paths (resolving `.` and `..`).
-pub fn join_posix(base: &str, rel: &str) -> String {
-    let combined = if base.is_empty() {
-        rel.to_string()
-    } else if rel.is_empty() {
-        base.to_string()
-    } else {
-        format!("{base}/{rel}")
-    };
-    normalize_posix(&combined)
-}
-
-/// Collapse `.` and `..` segments in a POSIX relative path.
-pub fn normalize_posix(raw: &str) -> String {
-    let mut stack: Vec<&str> = Vec::new();
-    for seg in raw.split('/') {
-        match seg {
-            "" | "." => {}
-            ".." => {
-                stack.pop();
-            }
-            other => stack.push(other),
-        }
-    }
-    stack.join("/")
 }

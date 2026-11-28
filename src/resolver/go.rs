@@ -1,6 +1,7 @@
 use std::path::Path;
 
-use crate::resolver::{GoModuleInfo, PackageManifest, ProjectIndex, ResolveOutcome, join_posix};
+use crate::paths::join_posix;
+use crate::resolver::{GoModuleInfo, PackageManifest, ProjectIndex, ResolveOutcome};
 
 /// Load module path from `go.mod`.
 pub fn load_go_mod(abs_path: &Path, dir: &str) -> Option<(PackageManifest, GoModuleInfo)> {

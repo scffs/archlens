@@ -13,6 +13,8 @@ pub mod report;
 pub mod resolver;
 pub mod scanner;
 
+mod paths;
+
 use std::collections::BTreeMap;
 
 pub use config::{
