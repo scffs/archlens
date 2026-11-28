@@ -257,22 +257,9 @@ const ArchInspector = (() => {
     const finalize = arr =>
       arr.map(e => ({ ...e, isDipOnly: e.weight > 0 && e.dipWeight === e.weight })).sort((a, b) => b.weight - a.weight);
 
-    const ca = caSet.size;
-    const ce = ceSet.size;
-    const instability = ca + ce === 0 ? null : ce / (ca + ce);
-    const totalSyms = node.abstractCount + node.concreteCount;
-    const abstractness = totalSyms === 0 ? null : node.abstractCount / totalSyms;
-    const distance = instability != null && abstractness != null ? Math.abs(abstractness + instability - 1.0) : null;
-    const band = (report && report.main_sequence_band) || 0.30;
-    let zone = 'isolated';
-    if (instability != null) {
-      if (abstractness == null) zone = 'no_entities';
-      else if (distance <= band) zone = 'main_sequence';
-      else if (abstractness + instability < 1.0) zone = 'zone_of_pain';
-      else zone = 'zone_of_uselessness';
-    }
+    const band = ArchModel.mainSequenceBand(report);
     return {
-      metrics: { ca, ce, instability, abstractness, distance, zone, activePain: zone === 'zone_of_pain' && node.hotspot >= 0.30, inCycle: false },
+      metrics: ArchModel.nodeMetrics(node, caSet.size, ceSet.size, band),
       outgoing: finalize([...outMap.values()]),
       incoming: finalize([...inMap.values()]),
     };

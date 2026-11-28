@@ -101,6 +101,31 @@ const ArchModel = (() => {
     return ccd / (n * n);
   }
 
+  const HOTSPOT_THRESHOLD = 0.30;
+  const mainSequenceBand = report => report?.main_sequence_band ?? 0.30;
+  const sdpTolerance = report => report?.sdp_tolerance ?? 0.05;
+  const computeInstability = (ca, ce) => ca + ce === 0 ? null : ce / (ca + ce);
+
+  function nodeMetrics(node, ca, ce, band, inCycle = false) {
+    const instability = computeInstability(ca, ce);
+    const totalSyms = node.abstractCount + node.concreteCount;
+    const abstractness = totalSyms === 0 ? null : node.abstractCount / totalSyms;
+    const distance =
+      instability != null && abstractness != null
+        ? Math.abs(abstractness + instability - 1.0)
+        : null;
+
+    let zone = 'isolated';
+    if (instability != null) {
+      if (abstractness == null) zone = 'no_entities';
+      else if (distance <= band) zone = 'main_sequence';
+      else if (abstractness + instability < 1.0) zone = 'zone_of_pain';
+      else zone = 'zone_of_uselessness';
+    }
+    const activePain = zone === 'zone_of_pain' && node.hotspot >= HOTSPOT_THRESHOLD;
+    return { ca, ce, instability, abstractness, distance, zone, activePain, inCycle };
+  }
+
   // Build hierarchical tree: package -> module -> file -> symbol
   function buildHierarchy(report, whatIf) {
     const fg = report.file_graph || { files: [], edges: [] };
@@ -269,10 +294,10 @@ const ArchModel = (() => {
     for (const id of modIds) {
       const ca = caSets.get(id).size;
       const ce = ceSets.get(id).size;
-      modInst.set(id, ca + ce === 0 ? null : ce / (ca + ce));
+      modInst.set(id, computeInstability(ca, ce));
     }
     let sdpCount = 0;
-    const tol = report.sdp_tolerance || 0.05;
+    const tol = sdpTolerance(report);
     for (const e of modEdgesArr) {
       const iF = modInst.get(e.from);
       const iT = modInst.get(e.to);
@@ -427,39 +452,15 @@ const ArchModel = (() => {
     const leafIds = [...visibleLeaves];
     const activeEdgesForScc = [...edgeAcc.values()].filter(e => e.activeWeight > 0);
     const { nodeScc, inCycle } = computeTarjanScc(leafIds, activeEdgesForScc);
-    const band = (report && report.main_sequence_band) || 0.30;
-    const tol = (report && report.sdp_tolerance) || 0.05;
+    const band = mainSequenceBand(report);
+    const tol = sdpTolerance(report);
 
     const leafMetrics = new Map();
     for (const id of leafIds) {
       const node = hierarchy.nodes.get(id);
       const ca = caSets.get(id)?.size || 0;
       const ce = ceSets.get(id)?.size || 0;
-      const instability = ca + ce === 0 ? null : ce / (ca + ce);
-      const totalSyms = node.abstractCount + node.concreteCount;
-      const abstractness = totalSyms === 0 ? null : node.abstractCount / totalSyms;
-      const distance =
-        instability != null && abstractness != null
-          ? Math.abs(abstractness + instability - 1.0)
-          : null;
-      let zone = 'isolated';
-      if (instability != null) {
-        if (abstractness == null) zone = 'no_entities';
-        else if (distance <= band) zone = 'main_sequence';
-        else if (abstractness + instability < 1.0) zone = 'zone_of_pain';
-        else zone = 'zone_of_uselessness';
-      }
-      const activePain = zone === 'zone_of_pain' && node.hotspot >= 0.30;
-      leafMetrics.set(id, {
-        ca,
-        ce,
-        instability,
-        abstractness,
-        distance,
-        zone,
-        activePain,
-        inCycle: inCycle.has(id),
-      });
+      leafMetrics.set(id, nodeMetrics(node, ca, ce, band, inCycle.has(id)));
     }
 
     // Also attach metrics to containers (rolled up)
@@ -471,7 +472,7 @@ const ArchModel = (() => {
         abstractness: null,
         distance: null,
         zone: 'container',
-        activePain: vn.data.hotspot >= 0.30,
+        activePain: vn.data.hotspot >= HOTSPOT_THRESHOLD,
         inCycle: false,
       };
     }
@@ -675,6 +676,8 @@ const ArchModel = (() => {
     computeTarjanScc,
     computePropagationCost,
     buildHierarchy,
+    mainSequenceBand,
+    nodeMetrics,
     projectCompoundGraph,
     computeBlastRadius,
     findPaths,

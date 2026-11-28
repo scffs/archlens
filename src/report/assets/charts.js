@@ -44,7 +44,7 @@ const ArchCharts = (() => {
     const pad = { l: 74, r: 44, t: 30, b: 64 };
     const pw = W - pad.l - pad.r;
     const ph = H - pad.t - pad.b;
-    const band = report.main_sequence_band || 0.30;
+    const band = ArchModel.mainSequenceBand(report);
 
     const sx = i => pad.l + i * pw;
     const sy = a => pad.t + (1 - a) * ph;
