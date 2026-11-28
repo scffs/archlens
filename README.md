@@ -67,3 +67,19 @@ built-in report language also requires an ID in the language inventory and
 bindings for the built-in parser, resolver, and CLI. The public parser and
 resolver contracts can be used by custom integrations without changing the
 analysis pipeline.
+
+## Mutation testing
+
+The Robustness workflow tests mutations of the Rust code changed by a pull
+request. Its weekly and manual runs test mutations across the whole crate in
+eight shards. Each shard saves the verdicts and logs as an Actions artifact,
+including when a mutant survives or times out. Run the full check on a branch
+that changes only tests to see whether its assertions still catch the same
+mutants.
+
+With [cargo-mutants](https://mutants.rs/) installed, run the full check with
+`cargo +stable mutants` or select a module with
+`cargo +stable mutants --file 'src/domain/**'`. Review `mutants.out/missed.txt`
+for survived mutations and the corresponding diffs and test logs for the
+behavior to assert. To check a test's individual contribution, rerun its
+mutants with the named test skipped and compare the verdicts.
