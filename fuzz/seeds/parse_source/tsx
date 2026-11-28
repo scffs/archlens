@@ -1,0 +1,2 @@
+fimport { Item } from './item';
+export const View = () => <Item />;

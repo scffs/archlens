@@ -1,0 +1,5 @@
+h<template><span>ok</span></template>
+<script setup lang="ts">
+import { run } from './worker'
+run()
+</script>

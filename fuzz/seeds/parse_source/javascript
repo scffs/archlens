@@ -1,0 +1,2 @@
+dimport { run } from './worker.js';
+export function start() { run(); }

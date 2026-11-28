@@ -1,0 +1,2 @@
+eimport type { Item } from './item';
+export interface Worker { take(item: Item): void }

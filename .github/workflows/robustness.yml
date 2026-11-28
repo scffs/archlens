@@ -5,6 +5,7 @@ name: Robustness
     paths:
       - 'src/**'
       - 'tests/**'
+      - 'fuzz/**'
       - 'Cargo.*'
       - '.cargo/mutants.toml'
       - '.github/workflows/robustness.yml'
@@ -25,3 +26,20 @@ jobs:
         run: cargo +stable install cargo-mutants --locked --version 27.1.0
       - name: Run mutation tests
         run: cargo +stable mutants --jobs 2
+
+  fuzz:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Rust nightly and cargo-fuzz
+        run: |
+          rustup toolchain install nightly --profile minimal --component rust-src
+          cargo +stable install cargo-fuzz --locked --version 0.13.2
+      - name: Run address-sanitized parser fuzz smoke test
+        run: |
+          cargo +nightly fetch --manifest-path fuzz/Cargo.toml --locked
+          mkdir -p fuzz/corpus/parse_source
+          cargo +nightly fuzz run parse_source fuzz/corpus/parse_source fuzz/seeds/parse_source -- -max_total_time=30 -max_len=4096 -verbosity=0 -print_final_stats=1

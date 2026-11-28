@@ -1,0 +1,4 @@
+bpackage demo
+import "fmt"
+type Runner interface { Run() }
+func Main() { fmt.Println("ok") }
