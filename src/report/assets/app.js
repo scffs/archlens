@@ -705,7 +705,10 @@
     lines.push(`- Охват изменений: ${(bm.propCost * 100).toFixed(1)}% -> ${(cm.propCost * 100).toFixed(1)}%`, '');
     if (state.whatIf.cutEdges.size > 0) {
       lines.push('## Разорвать зависимости');
-      for (const k of state.whatIf.cutEdges) lines.push(`- Убрать импорт: \`${k}\``);
+      for (const key of state.whatIf.cutEdges) {
+        const [from, to] = JSON.parse(key);
+        lines.push(`- Убрать импорт: \`${from}→${to}\``);
+      }
       lines.push('');
     }
     if (state.whatIf.movedFiles.size > 0) {

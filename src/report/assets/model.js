@@ -6,6 +6,8 @@ const ArchModel = (() => {
 
   const fmt = (v, d = 2) => (v == null || Number.isNaN(v) ? '—' : Number(v).toFixed(d));
 
+  const edgeKey = (from, to) => JSON.stringify([from, to]);
+
   function ideUri(rootPath, relPath, line = 1) {
     const cleanRoot = (rootPath || '').replace(/\/+$/, '');
     const abs = cleanRoot ? `${cleanRoot}/${relPath}` : relPath;
@@ -103,7 +105,7 @@ const ArchModel = (() => {
   function buildHierarchy(report, whatIf) {
     const fg = report.file_graph || { files: [], edges: [] };
     const ruleViolPairs = new Set(
-      (report.rule_violations || []).map(rv => `${rv.from_file}→${rv.to_file}`)
+      (report.rule_violations || []).map(rv => edgeKey(rv.from_file, rv.to_file))
     );
 
     const movedFiles = (whatIf && whatIf.movedFiles) || new Map();
@@ -234,7 +236,7 @@ const ArchModel = (() => {
 
     // Active file edges (with What-If cut flags)
     const fileEdges = (fg.edges || []).map(e => {
-      const key = `${e.from}→${e.to}`;
+      const key = edgeKey(e.from, e.to);
       return {
         ...e,
         key,
@@ -256,7 +258,7 @@ const ArchModel = (() => {
       if (!sf || !tf || sf.effectiveMod === tf.effectiveMod) continue;
       caSets.get(tf.effectiveMod).add(e.from);
       ceSets.get(sf.effectiveMod).add(e.to);
-      const k = `${sf.effectiveMod}→${tf.effectiveMod}`;
+      const k = edgeKey(sf.effectiveMod, tf.effectiveMod);
       if (!modEdgeMap.has(k)) modEdgeMap.set(k, { from: sf.effectiveMod, to: tf.effectiveMod, weight: 0 });
       modEdgeMap.get(k).weight += 1;
     }
@@ -396,7 +398,7 @@ const ArchModel = (() => {
           caSets.get(tgtLeaf)?.add(fe.from);
           ceSets.get(srcLeaf)?.add(fe.to);
         }
-        const key = `${srcLeaf}→${tgtLeaf}`;
+        const key = edgeKey(srcLeaf, tgtLeaf);
         if (!edgeAcc.has(key)) {
           edgeAcc.set(key, {
             id: key,
@@ -499,15 +501,15 @@ const ArchModel = (() => {
 
     // Optional hidden temporal coupling edges overlay (from Git history)
     if (showTemporal && report && report.git && report.git.temporal_couplings) {
-      const existingPairs = new Set(edges.map(e => `${e.from}→${e.to}`));
+      const existingPairs = new Set(edges.map(e => e.id));
       const addedTemp = new Set();
       for (const tc of report.git.temporal_couplings) {
         if (tc.has_static_edge) continue;
         const a = resolveVisibleLeaf(tc.file_a, null);
         const b = resolveVisibleLeaf(tc.file_b, null);
         if (!a || !b || a === b) continue;
-        const pairKey = a < b ? `${a}↔${b}` : `${b}↔${a}`;
-        if (addedTemp.has(pairKey) || existingPairs.has(`${a}→${b}`) || existingPairs.has(`${b}→${a}`)) {
+        const pairKey = a < b ? edgeKey(a, b) : edgeKey(b, a);
+        if (addedTemp.has(pairKey) || existingPairs.has(edgeKey(a, b)) || existingPairs.has(edgeKey(b, a))) {
           continue;
         }
         addedTemp.add(pairKey);
@@ -669,6 +671,7 @@ const ArchModel = (() => {
     esc,
     fmt,
     ideUri,
+    edgeKey,
     computeTarjanScc,
     computePropagationCost,
     buildHierarchy,

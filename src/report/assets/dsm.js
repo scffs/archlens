@@ -66,7 +66,7 @@ const ArchDsm = (() => {
       const u = resolveRow(fe.from);
       const v = resolveRow(fe.to);
       if (!u || !v || u === v) continue;
-      const key = `${u}→${v}`;
+      const key = ArchModel.edgeKey(u, v);
       if (!edgeMap.has(key)) {
         edgeMap.set(key, {
           id: key, from: u, to: v, weight: 0, activeWeight: 0, dipWeight: 0,
@@ -173,7 +173,7 @@ const ArchDsm = (() => {
             : 'Диагональ: сам компонент';
           html += `<td class="diag ${inCycle.has(row.id) ? 'in-scc' : ''}" data-tip="${diagTip}">${r + 1}</td>`;
         } else {
-          const edge = edgeMap.get(`${row.id}→${col.id}`);
+          const edge = edgeMap.get(ArchModel.edgeKey(row.id, col.id));
           if (!edge) {
             html += `<td class="${sameScc ? 'cell-scc-box' : ''}"></td>`;
           } else {
@@ -232,7 +232,7 @@ const ArchDsm = (() => {
       const to = td.getAttribute('data-to');
       const rIdx = td.getAttribute('data-r');
       const cIdx = td.getAttribute('data-c');
-      const edge = edgeMap.get(`${from}→${to}`);
+      const edge = edgeMap.get(ArchModel.edgeKey(from, to));
       if (!edge) return;
       td.addEventListener('mouseenter', () => {
         container.querySelector(`th[data-row-idx="${rIdx}"]`)?.classList.add('row-hover');

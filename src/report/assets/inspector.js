@@ -48,7 +48,7 @@ const ArchInspector = (() => {
   function renderEdgeInspector(el, report, edge, appState, callbacks) {
     const fileEdges = edge.fileEdges || [];
     const cutSet = appState.whatIf.cutEdges;
-    const allCut = fileEdges.length > 0 && fileEdges.every(fe => cutSet.has(`${fe.from}→${fe.to}`));
+    const allCut = fileEdges.length > 0 && fileEdges.every(fe => cutSet.has(ArchModel.edgeKey(fe.from, fe.to)));
 
     if (edge.isTemporal && edge.temporalInfo) {
       const tc = edge.temporalInfo;
@@ -109,7 +109,7 @@ const ArchInspector = (() => {
       <div class="section-hdr">Импорты по файлам (${fileEdges.length})</div>
       <div style="max-height:380px;overflow-y:auto">
         ${fileEdges.map(fe => {
-          const k = `${fe.from}→${fe.to}`;
+          const k = ArchModel.edgeKey(fe.from, fe.to);
           const isCut = cutSet.has(k);
           return `
             <div class="card-item" style="padding:9px 11px;margin-bottom:7px;${isCut ? 'opacity:0.55;outline:1px dashed var(--td-purple-color)' : ''}">
@@ -134,7 +134,7 @@ const ArchInspector = (() => {
 
     document.getElementById('btn-edge-close')?.addEventListener('click', () => callbacks.onClearSelection());
     document.getElementById('btn-cut-agg')?.addEventListener('click', () => {
-      const keys = fileEdges.map(fe => `${fe.from}→${fe.to}`);
+      const keys = fileEdges.map(fe => ArchModel.edgeKey(fe.from, fe.to));
       callbacks.onToggleCutBatch(keys, !allCut);
     });
     document.getElementById('btn-focus-edge-graph')?.addEventListener('click', () => {
@@ -147,7 +147,7 @@ const ArchInspector = (() => {
 
   function renderPathInspector(el, report, hierarchy, graphEdges, appState, callbacks) {
     const paths = appState.pathResults || [];
-    const edgeLookup = new Map(graphEdges.map(e => [`${e.from}→${e.to}`, e]));
+    const edgeLookup = new Map(graphEdges.map(e => [ArchModel.edgeKey(e.from, e.to), e]));
 
     el.innerHTML = `
       <div class="section-hdr no-border">
@@ -165,7 +165,7 @@ const ArchInspector = (() => {
             <div style="font-weight:700;font-size:12.5px;margin-bottom:5px">Путь #${idx + 1} (шагов: ${p.length - 1})</div>
             ${p.slice(0, -1).map((fromId, i) => {
               const toId = p[i + 1];
-              const edge = edgeLookup.get(`${fromId}→${toId}`);
+              const edge = edgeLookup.get(ArchModel.edgeKey(fromId, toId));
               const syms = edge ? [...new Set((edge.fileEdges || []).flatMap(fe => fe.symbols || []))].slice(0, 4) : [];
               return `
                 <div class="edge-sample">
@@ -222,7 +222,7 @@ const ArchInspector = (() => {
       if (fromOwn) {
         if (!fe.isCut) ceSet.add(fe.to);
         const tgt = targetGroupForFile(fe.to);
-        const k = `${id}→${tgt}`;
+        const k = ArchModel.edgeKey(id, tgt);
         if (!outMap.has(k)) {
           outMap.set(k, {
             id: k, from: id, to: tgt, weight: 0, activeWeight: 0, dipWeight: 0, cutCount: 0,
@@ -238,7 +238,7 @@ const ArchInspector = (() => {
       } else {
         if (!fe.isCut) caSet.add(fe.from);
         const src = targetGroupForFile(fe.from);
-        const k = `${src}→${id}`;
+        const k = ArchModel.edgeKey(src, id);
         if (!inMap.has(k)) {
           inMap.set(k, {
             id: k, from: src, to: id, weight: 0, activeWeight: 0, dipWeight: 0, cutCount: 0,
