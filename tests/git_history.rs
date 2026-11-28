@@ -113,6 +113,92 @@ fn temporal_coupling_limit_uses_a_stable_order_for_tied_pairs() {
 }
 
 #[test]
+fn temporal_coupling_prioritizes_hidden_cross_module_changes() {
+    let temp = TempDir::new().expect("tempdir");
+    let root = temp.path();
+    git(root, &["init", "--quiet"]);
+    for dir in ["app", "core", "internal"] {
+        fs::create_dir(root.join(dir)).expect("create module");
+    }
+
+    let files = [
+        ("app/api.ts", ""),
+        ("app/ui.ts", ""),
+        (
+            "core/api.ts",
+            "import { version as appVersion } from '../app/api';\nexport const upstream = appVersion;\n",
+        ),
+        ("internal/reconcile.ts", ""),
+        ("internal/weak.ts", ""),
+    ];
+    fs::write(root.join("internal/one_off.ts"), "export const once = 1;\n")
+        .expect("write file touched by one commit");
+    for version in 0..4 {
+        for (name, source) in files {
+            fs::write(
+                root.join(name),
+                format!("{source}export const version = {version};\n"),
+            )
+            .expect("write source");
+        }
+        if version == 3 {
+            // A bulk edit still counts as churn but contributes no co-change pairs.
+            for index in 0..22 {
+                fs::write(
+                    root.join(format!("bulk_{index:02}.ts")),
+                    "export const bulk = true;\n",
+                )
+                .expect("write bulk edit");
+            }
+        }
+        git(root, &["add", "--", "."]);
+        git(root, &["commit", "--quiet", "-m", "change modules"]);
+    }
+    for version in 4..14 {
+        // Three shared commits out of 4 + 14 changes give a strength below 0.35.
+        fs::write(
+            root.join("internal/weak.ts"),
+            format!("export const version = {version};\n"),
+        )
+        .expect("change weakly coupled file");
+        git(
+            root,
+            &["commit", "--quiet", "--all", "-m", "change one file"],
+        );
+    }
+
+    let report = analyze(&AnalysisConfig::new(root)).expect("analyze Git fixture");
+    let history = report.git.expect("Git history");
+    assert_eq!(history.active_files, 28);
+    let pairs: Vec<_> = history
+        .temporal_couplings
+        .iter()
+        .map(|pair| {
+            assert_eq!(pair.shared_commits, 3);
+            assert_eq!((pair.commits_a, pair.commits_b), (4, 4));
+            assert_eq!(pair.strength, 0.75);
+            (
+                pair.file_a.as_str(),
+                pair.file_b.as_str(),
+                pair.has_static_edge,
+                pair.cross_module,
+            )
+        })
+        .collect();
+    assert_eq!(
+        pairs,
+        [
+            ("app/api.ts", "internal/reconcile.ts", false, true),
+            ("app/ui.ts", "core/api.ts", false, true),
+            ("app/ui.ts", "internal/reconcile.ts", false, true),
+            ("core/api.ts", "internal/reconcile.ts", false, true),
+            ("app/api.ts", "app/ui.ts", false, false),
+            ("app/api.ts", "core/api.ts", true, true),
+        ],
+    );
+}
+
+#[test]
 fn git_history_uses_literal_paths_and_attributes_renames_to_the_destination() {
     let temp = TempDir::new().expect("tempdir");
     let root_path = temp.path().join(if cfg!(unix) {
