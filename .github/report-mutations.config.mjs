@@ -28,7 +28,7 @@ export default {
   concurrency: all ? 4 : 2,
   // Let the CLI and Chrome reach their own limits and close the test profile.
   timeoutMS: all ? 28000 : 1500,
-  thresholds: { break: all ? null : 50 },
+  thresholds: { break: all ? null : 95 },
   reporters: ['clear-text', 'progress', 'json'],
   ignorePatterns: ['/target', '/fuzz', '/mutants.out', '/mutants.out.old'],
 };
