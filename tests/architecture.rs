@@ -49,10 +49,19 @@ fn imports_respect_adapter_boundaries() {
                 let resolver_imports_other_stage = file.path.starts_with("src/resolver/")
                     && matches!(module, Some("parser" | "plugins" | "scanner"));
 
+                let generic_imports_framework = file.path == "src/resolver/js_ts/imports.rs"
+                    && matches!(
+                        target.as_str(),
+                        "src/resolver/nuxt.rs"
+                            | "src/resolver/web_defaults.rs"
+                            | "src/resolver/js_ts.rs"
+                    );
+
                 if domain_imports_adapter
                     || adapter_imports_dispatcher
                     || parser_imports_other_stage
                     || resolver_imports_other_stage
+                    || generic_imports_framework
                 {
                     violations.push(format!("{}:{} -> {target}", file.path, import.line));
                 }

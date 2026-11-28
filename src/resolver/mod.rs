@@ -6,14 +6,16 @@ pub mod rust;
 mod dispatch;
 mod index;
 mod index_builder;
+mod nuxt;
+mod web_defaults;
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::Path;
 
-pub(crate) use self::dispatch::builtin_resolver;
+pub(crate) use self::dispatch::BuiltinResolvers;
 pub use self::index::{
-    GoModuleInfo, ImportResolver, JsPackageInfo, PackageManifest, ProjectIndex, ResolveOutcome, RustCrateInfo,
-    TsConfigInfo,
+    GoModuleInfo, ImportResolver, JsPackageInfo, PackageManifest, ProjectIndex, ResolveOutcome,
+    RustCrateInfo, TsConfigInfo,
 };
 use crate::domain::model::{FileEdge, FileGraph, FileNode, ImportKind, ParsedFile};
 use crate::domain::projection::assign_auto_module_ids;
@@ -32,7 +34,14 @@ pub fn resolve_file_graph(
     include_mod_decls: bool,
     include_tests: bool,
 ) -> FileGraph {
-    resolve_file_graph_with(root, parsed_files, include_mod_decls, include_tests, builtin_resolver)
+    let resolvers = BuiltinResolvers::new(root);
+    resolve_file_graph_with(
+        root,
+        parsed_files,
+        include_mod_decls,
+        include_tests,
+        |file| resolvers.for_file(file),
+    )
 }
 
 pub(crate) fn resolve_file_graph_with<'r>(
@@ -45,7 +54,8 @@ pub(crate) fn resolve_file_graph_with<'r>(
     let active_files: Vec<&ParsedFile> = if include_tests {
         parsed_files.iter().collect()
     } else {
-        let all_paths: HashSet<String> = parsed_files.iter().map(|file| file.path.clone()).collect();
+        let all_paths: HashSet<String> =
+            parsed_files.iter().map(|file| file.path.clone()).collect();
         let excluded_test_paths: HashSet<String> = parsed_files
             .iter()
             .flat_map(|file| resolver_for(file).test_only_files(&all_paths, file))
@@ -117,10 +127,12 @@ pub(crate) fn resolve_file_graph_with<'r>(
                 || symbols
                     .iter()
                     .any(|s| impl_trait_names.contains(s.as_str()));
-            let all_type_only = !acc.kinds.is_empty()
-                && acc.kinds.iter().all(|&k| k == ImportKind::TypeOnly);
+            let all_type_only =
+                !acc.kinds.is_empty() && acc.kinds.iter().all(|&k| k == ImportKind::TypeOnly);
             let only_abstract_symbols = !symbols.is_empty()
-                && symbols.iter().any(|s| index.file_declares_abstract(&target, s))
+                && symbols
+                    .iter()
+                    .any(|s| index.file_declares_abstract(&target, s))
                 && symbols.iter().all(|s| {
                     !index.file_declares_symbol(&target, s)
                         || index.file_declares_abstract(&target, s)

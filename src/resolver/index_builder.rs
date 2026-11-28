@@ -5,14 +5,15 @@ use ignore::WalkBuilder;
 
 use crate::domain::model::{ImportKind, Language, ParsedFile};
 use crate::paths::{join_posix, normalize_rel_path, parent_dir};
-use crate::resolver::dispatch::builtin_resolver;
+use crate::resolver::dispatch::BuiltinResolvers;
 use crate::resolver::index::{ImportResolver, ProjectIndex, ResolveOutcome};
 use crate::resolver::{go, js_ts, python, rust};
 
 impl ProjectIndex {
     /// Build a repository index from `root` and the list of parsed source files.
     pub fn build(root: &Path, parsed_files: &[ParsedFile]) -> Self {
-        Self::build_for_files(root, parsed_files.iter(), builtin_resolver)
+        let resolvers = BuiltinResolvers::new(root);
+        Self::build_for_files(root, parsed_files.iter(), |file| resolvers.for_file(file))
     }
 
     pub(super) fn build_for_files<'a, 'r>(

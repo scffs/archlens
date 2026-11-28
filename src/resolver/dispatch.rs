@@ -1,8 +1,10 @@
 use std::collections::HashSet;
+use std::path::Path;
 
 use crate::domain::model::{Language, ParsedFile, RawImport};
 use crate::resolver::index::{ImportResolver, ProjectIndex, ResolveOutcome};
-use crate::resolver::{go, js_ts, python, rust};
+use crate::resolver::web_defaults::ProjectResolver;
+use crate::resolver::{go, python, rust};
 
 type ResolveImport = fn(&ProjectIndex, &str, &RawImport) -> ResolveOutcome;
 type TestFiles = fn(&HashSet<String>, &ParsedFile) -> Vec<String>;
@@ -33,10 +35,6 @@ impl ImportResolver for BuiltinResolver {
     }
 }
 
-fn resolve_js_ts(index: &ProjectIndex, from: &str, import: &RawImport) -> ResolveOutcome {
-    js_ts::resolve_js_ts_import(index, from, &import.specifier)
-}
-
 fn rust_test_files(paths: &HashSet<String>, file: &ParsedFile) -> Vec<String> {
     file.cfg_test_mods
         .iter()
@@ -44,34 +42,41 @@ fn rust_test_files(paths: &HashSet<String>, file: &ParsedFile) -> Vec<String> {
         .collect()
 }
 
-pub(crate) fn builtin_resolver(file: &ParsedFile) -> &'static dyn ImportResolver {
-    const RUST: BuiltinResolver = BuiltinResolver {
-        resolve: rust::resolve_rust_import,
-        reexport: Some(rust::resolve_rust_import_direct),
-        test_files: Some(rust_test_files),
-    };
-    const JS_TS: BuiltinResolver = BuiltinResolver {
-        resolve: resolve_js_ts,
-        reexport: Some(resolve_js_ts),
-        test_files: None,
-    };
-    const PYTHON: BuiltinResolver = BuiltinResolver {
-        resolve: |index, from, import| {
-            python::resolve_python_import(index, from, &import.specifier)
-        },
-        reexport: None,
-        test_files: None,
-    };
-    const GO: BuiltinResolver = BuiltinResolver {
-        resolve: |index, _, import| go::resolve_go_import(index, &import.specifier),
-        reexport: None,
-        test_files: None,
-    };
+pub(crate) struct BuiltinResolvers<'a> {
+    javascript: ProjectResolver<'a>,
+}
 
-    match file.language {
-        Language::Rust => &RUST,
-        Language::TypeScript | Language::JavaScript | Language::Vue => &JS_TS,
-        Language::Python => &PYTHON,
-        Language::Go => &GO,
+impl<'a> BuiltinResolvers<'a> {
+    pub(crate) fn new(root: &'a Path) -> Self {
+        Self {
+            javascript: ProjectResolver::new(root),
+        }
+    }
+
+    pub(crate) fn for_file(&self, file: &ParsedFile) -> &dyn ImportResolver {
+        const RUST: BuiltinResolver = BuiltinResolver {
+            resolve: rust::resolve_rust_import,
+            reexport: Some(rust::resolve_rust_import_direct),
+            test_files: Some(rust_test_files),
+        };
+        const PYTHON: BuiltinResolver = BuiltinResolver {
+            resolve: |index, from, import| {
+                python::resolve_python_import(index, from, &import.specifier)
+            },
+            reexport: None,
+            test_files: None,
+        };
+        const GO: BuiltinResolver = BuiltinResolver {
+            resolve: |index, _, import| go::resolve_go_import(index, &import.specifier),
+            reexport: None,
+            test_files: None,
+        };
+
+        match file.language {
+            Language::Rust => &RUST,
+            Language::TypeScript | Language::JavaScript | Language::Vue => &self.javascript,
+            Language::Python => &PYTHON,
+            Language::Go => &GO,
+        }
     }
 }
