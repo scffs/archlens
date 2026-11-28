@@ -1,17 +1,16 @@
-const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const test = require('node:test');
-const vm = require('node:vm');
+import { expect, test } from 'bun:test';
 
-const modelPath = path.join(__dirname, '../src/report/assets/model.js');
-const modelSource = fs.readFileSync(modelPath, 'utf8');
-// The Stryker command runner activates instrumented code through this environment key.
-const activeMutant = process.env.__STRYKER_ACTIVE_MUTANT__;
-const context = activeMutant === undefined
-  ? {}
-  : { process: { env: { __STRYKER_ACTIVE_MUTANT__: activeMutant } } };
-const model = vm.runInNewContext(modelSource + '\nArchModel', context, { filename: modelPath });
+// The HTML embeds this script without module exports. Expose its existing API for Bun.
+Bun.plugin({
+  name: 'load the report model',
+  setup(build) {
+    build.onLoad({ filter: /[/]report[/]assets[/]model[.]js$/ }, async ({ path }) => ({
+      contents: await Bun.file(path).text() + '\nexport default ArchModel;',
+      loader: 'js',
+    }));
+  },
+});
+const { default: model } = await import('../src/report/assets/model.js');
 
 function sourceFile(filePath, moduleId = filePath) {
   return { path: filePath, module_id: moduleId, language: 'javascript' };
@@ -32,10 +31,10 @@ test('file edges with an arrow in a path retain separate cuts and rule violation
   const cutEdges = new Set([before.fileEdges[0].key]);
   const after = model.buildHierarchy(report, { cutEdges });
 
-  assert.equal(after.fileEdges[0].isCut, true);
-  assert.equal(after.fileEdges[0].isRuleViolation, true);
-  assert.equal(after.fileEdges[1].isCut, false);
-  assert.equal(after.fileEdges[1].isRuleViolation, false);
+  expect(after.fileEdges[0].isCut).toBe(true);
+  expect(after.fileEdges[0].isRuleViolation).toBe(true);
+  expect(after.fileEdges[1].isCut).toBe(false);
+  expect(after.fileEdges[1].isRuleViolation).toBe(false);
 });
 
 test('visible edges with an arrow in a module ID stay distinct', () => {
@@ -57,9 +56,9 @@ test('visible edges with an arrow in a module ID stay distinct', () => {
   const hierarchy = model.buildHierarchy(report);
   const graph = model.projectCompoundGraph(hierarchy, { expandedIds: new Set(), report });
 
-  assert.equal(graph.edges.length, 2);
-  assert.equal(graph.edges[0].weight, 1);
-  assert.equal(graph.edges[1].weight, 1);
+  expect(graph.edges.length).toBe(2);
+  expect(graph.edges[0].weight).toBe(1);
+  expect(graph.edges[1].weight).toBe(1);
 });
 
 test('an explicitly zero Main Sequence band is used in the projected graph', () => {
@@ -77,8 +76,8 @@ test('an explicitly zero Main Sequence band is used in the projected graph', () 
   const graph = model.projectCompoundGraph(hierarchy, { expandedIds: new Set(), report });
   const core = graph.nodes.find(node => node.id === 'mod:core.js');
 
-  assert.equal(core.metrics.distance, 0.25);
-  assert.equal(core.metrics.zone, 'zone_of_pain');
+  expect(core.metrics.distance).toBe(0.25);
+  expect(core.metrics.zone).toBe('zone_of_pain');
 });
 
 test('an explicitly zero SDP tolerance is used in both report graph and simulation', () => {
@@ -99,8 +98,8 @@ test('an explicitly zero SDP tolerance is used in both report graph and simulati
   const graph = model.projectCompoundGraph(hierarchy, { expandedIds: new Set(), report });
   const edge = graph.edges.find(edge => edge.from === 'mod:source' && edge.to === 'mod:target');
 
-  assert.equal(hierarchy.moduleMetrics.sdpCount, 1);
-  assert.equal(edge.isSdpViolation, true);
+  expect(hierarchy.moduleMetrics.sdpCount).toBe(1);
+  expect(edge.isSdpViolation).toBe(true);
 });
 
 test('cycles and propagation measure the same directed graph', () => {
@@ -115,8 +114,8 @@ test('cycles and propagation measure the same directed graph', () => {
   ];
 
   const { inCycle } = model.computeTarjanScc(ids, edges);
-  assert.deepEqual([...inCycle].sort(), ['a', 'b']);
-  assert.equal(model.computePropagationCost(ids, edges), 5 / 9);
+  expect([...inCycle].sort()).toEqual(['a', 'b']);
+  expect(model.computePropagationCost(ids, edges)).toBe(5 / 9);
 });
 
 function randomFrom(seed) {
@@ -155,21 +154,18 @@ test('generated directed graphs agree with independent reachability', () => {
     }
 
     const { nodeScc, inCycle } = model.computeTarjanScc(ids, edges);
-    assert.equal(nodeScc.size, ids.length, `sample ${sample}: component membership`);
+    expect(nodeScc.size, `sample ${sample}: component membership`).toBe(ids.length);
     for (const [from, source] of ids.entries()) {
       const cyclic = ids.some((_, to) => from !== to && reachable[from][to] && reachable[to][from]);
-      assert.equal(inCycle.has(source), cyclic, `sample ${sample}: cycle at ${source}`);
+      expect(inCycle.has(source), `sample ${sample}: cycle at ${source}`).toBe(cyclic);
       for (const [to, target] of ids.entries()) {
-        assert.equal(
-          nodeScc.get(source) === nodeScc.get(target),
-          reachable[from][to] && reachable[to][from],
-          `sample ${sample}: ${source} and ${target}`,
-        );
+        expect(nodeScc.get(source) === nodeScc.get(target), `sample ${sample}: ${source} and ${target}`)
+          .toBe(reachable[from][to] && reachable[to][from]);
       }
     }
 
     const cost = ids.length === 0 ? 0 : reachable.flat().filter(Boolean).length / ids.length ** 2;
-    assert.equal(model.computePropagationCost(ids, edges), cost, `sample ${sample}: propagation`);
+    expect(model.computePropagationCost(ids, edges), `sample ${sample}: propagation`).toBe(cost);
   }
 });
 
@@ -211,11 +207,11 @@ test('generated What-If edits retain exactly the visible imports and cuts', () =
       const actual = new Map();
       for (const edge of projected.edges) {
         const key = JSON.stringify([edge.from, edge.to]);
-        assert.equal(edge.id, key);
+        expect(edge.id).toBe(key);
         actual.set(key, [edge.weight, edge.activeWeight, edge.cutCount]);
       }
-      assert.equal(actual.size, projected.edges.length, `sample ${sample}: unique edges`);
-      assert.deepEqual(actual, expected, `sample ${sample}: showCutEdges=${showCutEdges}`);
+      expect(actual.size, `sample ${sample}: unique edges`).toBe(projected.edges.length);
+      expect(actual, `sample ${sample}: showCutEdges=${showCutEdges}`).toEqual(expected);
     }
   }
 });

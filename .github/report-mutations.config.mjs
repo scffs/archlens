@@ -1,7 +1,5 @@
-import { readFileSync } from 'node:fs';
-
 const model = 'src/report/assets/model.js';
-const modelLines = readFileSync(new URL('../' + model, import.meta.url), 'utf8').split('\n');
+const modelLines = (await Bun.file(new URL('../' + model, import.meta.url)).text()).split('\n');
 
 function modelRange(start, end) {
   const first = modelLines.findIndex(line => line.startsWith(start));
@@ -10,7 +8,7 @@ function modelRange(start, end) {
   return model + ':' + (first + 1) + '-' + next;
 }
 
-const asset = process.env.REPORT_MUTATION_ASSET ?? 'core';
+const asset = Bun.env.REPORT_MUTATION_ASSET ?? 'core';
 const all = asset !== 'core';
 
 export default {
@@ -22,10 +20,10 @@ export default {
   ],
   testRunner: 'command',
   commandRunner: {
-    command: 'node --test --test-isolation=none tests/*.test.js'
-      + (all ? ' && bun test ./tests/report_browser.test.mjs' : ''),
+    command: 'bun test ./tests/report_model.test.js'
+      + (all ? ' ./tests/report_browser.test.mjs' : ''),
   },
-  // The command runner provides test exit status. CI prints Node coverage separately.
+  // The Stryker command runner reports test exit status without per-mutant coverage.
   coverageAnalysis: 'off',
   concurrency: all ? 4 : 2,
   // Let the CLI and Chrome reach their own limits and close the test profile.
