@@ -37,7 +37,6 @@
     lang: 'all',
     search: '',
     selectedNodeId: null,
-    selectedEdgeId: null,
     selectedEdge: null,
     expandedIds: new Set(),
     dsmExpandedIds: new Set(),
@@ -68,7 +67,7 @@
     },
   };
 
-  let baselineHierarchy = ArchModel.buildHierarchy(REPORT, null);
+  const baselineHierarchy = ArchModel.buildHierarchy(REPORT, null);
   let hierarchy = baselineHierarchy;
   let graphDirty = true;
 
@@ -352,8 +351,8 @@
     ArchGraph.rebuild(projected, state, preserveCamera);
     graphDirty = false;
     updateGraphHud();
-    if (state.selectedEdgeId) {
-      const updated = projected.edges.find(e => e.id === state.selectedEdgeId);
+    if (state.selectedEdge) {
+      const updated = projected.edges.find(e => e.id === state.selectedEdge.id);
       state.selectedEdge = updated || state.selectedEdge;
     }
     renderInspectorPanel();
@@ -392,7 +391,6 @@
     hideTip,
     onSelectNode: id => {
       state.selectedNodeId = id;
-      state.selectedEdgeId = null;
       state.selectedEdge = null;
       if (state.tab === 'graph') ArchGraph.draw(state);
       else renderActiveTab(true);
@@ -402,7 +400,6 @@
       const hid = resolveViewNodeToHierarchyId(viewNodeId);
       if (hid) {
         state.selectedNodeId = hid;
-        state.selectedEdgeId = null;
         state.selectedEdge = null;
         renderActiveTab(true);
         renderInspectorPanel();
@@ -412,7 +409,6 @@
       const fid = `file:${filePath}`;
       if (hierarchy.nodes.has(fid)) {
         state.selectedNodeId = fid;
-        state.selectedEdgeId = null;
         state.selectedEdge = null;
         ensureAncestorsExpanded(fid);
         graphDirty = true;
@@ -422,13 +418,11 @@
     },
     onSelectEdge: edge => {
       state.selectedEdge = edge;
-      state.selectedEdgeId = edge.id;
       if (state.tab === 'graph') ArchGraph.draw(state);
       renderInspectorPanel();
     },
     onClearSelection: () => {
       state.selectedNodeId = null;
-      state.selectedEdgeId = null;
       state.selectedEdge = null;
       state.pathFromId = null;
       state.pathToId = null;
@@ -449,7 +443,6 @@
     },
     onOpenEgo: id => {
       state.selectedNodeId = id;
-      state.selectedEdgeId = null;
       state.selectedEdge = null;
       state.graphLayout = 'ego';
       updateLayoutButtons();
@@ -463,7 +456,6 @@
       ensureAncestorsExpanded(edge.from);
       ensureAncestorsExpanded(edge.to);
       state.selectedEdge = edge;
-      state.selectedEdgeId = edge.id;
       graphDirty = true;
       switchTab('graph');
       renderCompoundGraph(false);
@@ -479,7 +471,6 @@
       if (!state.pathFromId) state.pathFromId = state.selectedNodeId;
       state.pathToId = id;
       state.selectedEdge = null;
-      state.selectedEdgeId = null;
       if (state.tab !== 'graph') switchTab('graph');
       renderCompoundGraph(true);
     },
@@ -535,7 +526,8 @@
   };
 
   function renderInspectorPanel() {
-    ArchInspector.render(REPORT, hierarchy, ArchGraph.getEdges(), state, callbacks);
+    const graph = { nodes: ArchGraph.getNodes(), edges: ArchGraph.getEdges() };
+    ArchInspector.render(REPORT, hierarchy, graph, state, callbacks);
   }
 
   function renderActiveTab(preserveCamera = false) {

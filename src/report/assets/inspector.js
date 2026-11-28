@@ -12,12 +12,12 @@ const ArchInspector = (() => {
     return String(id || '').replace(/^(pkg|mod|file|sym):/, '');
   }
 
-  function render(report, hierarchy, graphEdges, appState, callbacks) {
+  function render(report, hierarchy, graph, appState, callbacks) {
     const el = document.getElementById('inspector');
     if (!el) return;
 
     if (appState.pathFromId && appState.pathToId) {
-      renderPathInspector(el, report, hierarchy, graphEdges, appState, callbacks);
+      renderPathInspector(el, report, hierarchy, graph.edges, appState, callbacks);
       return;
     }
 
@@ -27,7 +27,7 @@ const ArchInspector = (() => {
     }
 
     if (appState.selectedNodeId && hierarchy.nodes.has(appState.selectedNodeId)) {
-      renderNodeInspector(el, report, hierarchy, graphEdges, appState, callbacks);
+      renderNodeInspector(el, report, hierarchy, graph, appState, callbacks);
       return;
     }
 
@@ -192,14 +192,14 @@ const ArchInspector = (() => {
     });
   }
 
-  function computeNodeDetails(report, hierarchy, graphEdges, node) {
+  function computeNodeDetails(report, hierarchy, graph, node) {
     const id = node.id;
-    const visibleMatch = ArchGraph.getNodes().find(n => n.id === id && !n.isExpanded);
+    const visibleMatch = graph.nodes.find(n => n.id === id && !n.isExpanded);
     if (visibleMatch && visibleMatch.metrics) {
       return {
         metrics: visibleMatch.metrics,
-        outgoing: graphEdges.filter(e => e.from === id && !e.isTemporal).sort((a, b) => b.weight - a.weight),
-        incoming: graphEdges.filter(e => e.to === id && !e.isTemporal).sort((a, b) => b.weight - a.weight),
+        outgoing: graph.edges.filter(e => e.from === id && !e.isTemporal).sort((a, b) => b.weight - a.weight),
+        incoming: graph.edges.filter(e => e.to === id && !e.isTemporal).sort((a, b) => b.weight - a.weight),
       };
     }
 
@@ -278,13 +278,13 @@ const ArchInspector = (() => {
     };
   }
 
-  function renderNodeInspector(el, report, hierarchy, graphEdges, appState, callbacks) {
+  function renderNodeInspector(el, report, hierarchy, graph, appState, callbacks) {
     const id = appState.selectedNodeId;
     const node = hierarchy.nodes.get(id);
     if (!node) return;
 
     const clean = cleanId(id);
-    const { metrics: m, outgoing, incoming } = computeNodeDetails(report, hierarchy, graphEdges, node);
+    const { metrics: m, outgoing, incoming } = computeNodeDetails(report, hierarchy, graph, node);
     const allLocalEdges = [...outgoing, ...incoming];
     const canExpand = node.children.length > 0;
     const isExpanded = appState.expandedIds.has(id);
