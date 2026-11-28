@@ -1,5 +1,6 @@
 /target
 .DS_Store
 *.html
+!/src/report/shell.html
 *.json
 !fixtures/**/*.json
