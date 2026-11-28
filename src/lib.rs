@@ -9,6 +9,7 @@ pub mod domain;
 pub mod error;
 pub mod git;
 pub mod parser;
+pub mod plugins;
 pub mod report;
 pub mod resolver;
 pub mod scanner;
@@ -32,23 +33,37 @@ pub use domain::model::{
     SymbolDecl, SymbolKind, TemporalCoupling, Visibility,
 };
 pub use error::{ArchLensError, Result};
+pub use plugins::AnalysisPlugins;
 
 /// Scan, parse, resolve, enrich with Git history, and compute all architecture views & metrics.
 pub fn analyze(config: &AnalysisConfig) -> Result<AnalysisReport> {
+    analyze_with_plugins(config, &AnalysisPlugins::default())
+}
+
+/// Analyze a repository with extensions supplied explicitly by the caller.
+pub fn analyze_with_plugins(
+    config: &AnalysisConfig,
+    plugins: &AnalysisPlugins<'_>,
+) -> Result<AnalysisReport> {
     let canonical_root = config
         .root
         .canonicalize()
         .unwrap_or_else(|_| config.root.clone());
 
-    let scanned = scanner::scan_repository(config)?;
+    let scanned =
+        scanner::scan_repository_with(config, |ext| plugins.language_for_extension(ext))?;
     let mut parsed_files = Vec::with_capacity(scanned.len());
-    for file in &scanned {
-        parsed_files.push(parser::parse_file(
+    for file in scanned {
+        let mut parsed = parser::parse_file_with(
             &file.abs_path,
             &file.rel_path,
-            file.language,
+            plugins.parser(file.language, &file.abs_path),
             config.include_tests,
-        )?);
+        )?;
+        // Source identity comes from discovery. Parsers supply the file's syntax facts.
+        parsed.path = file.rel_path;
+        parsed.language = file.language;
+        parsed_files.push(parsed);
     }
 
     let mut file_graph = resolver::resolve_file_graph(

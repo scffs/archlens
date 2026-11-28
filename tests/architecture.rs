@@ -33,7 +33,7 @@ fn imports_respect_adapter_boundaries() {
                 let domain_imports_adapter = file.path.starts_with("src/domain/")
                     && matches!(
                         module,
-                        Some("git" | "parser" | "report" | "resolver" | "scanner")
+                        Some("git" | "parser" | "plugins" | "report" | "resolver" | "scanner")
                     );
                 let adapter_imports_dispatcher = [
                     ("src/parser/", "src/parser/mod.rs"),
@@ -44,7 +44,16 @@ fn imports_respect_adapter_boundaries() {
                     file.path.starts_with(dir) && file.path != *dispatcher && target == *dispatcher
                 });
 
-                if domain_imports_adapter || adapter_imports_dispatcher {
+                let parser_imports_other_stage = file.path.starts_with("src/parser/")
+                    && matches!(module, Some("plugins" | "resolver" | "scanner"));
+                let resolver_imports_other_stage = file.path.starts_with("src/resolver/")
+                    && matches!(module, Some("parser" | "plugins" | "scanner"));
+
+                if domain_imports_adapter
+                    || adapter_imports_dispatcher
+                    || parser_imports_other_stage
+                    || resolver_imports_other_stage
+                {
                     violations.push(format!("{}:{} -> {target}", file.path, import.line));
                 }
             }
