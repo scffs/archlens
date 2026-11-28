@@ -1,0 +1,22 @@
+[package]
+name = "archlens-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+archlens = { path = ".." }
+libfuzzer-sys = "0.4"
+
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "parse_source"
+path = "fuzz_targets/parse_source.rs"
+test = false
+doc = false
+bench = false

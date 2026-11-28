@@ -1,0 +1,3 @@
+gfrom .worker import run
+def start():
+    run()
