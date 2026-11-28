@@ -109,3 +109,72 @@ fn relocation_spares_small_modules_and_cores_shared_between_modules() {
     let independent_consumers = [same_consumer.as_slice(), &[("spare/a.rs", MOVER)]].concat();
     assert!(recommendations(FILES, &independent_consumers).is_empty());
 }
+
+#[test]
+fn recommendations_rank_by_target_count_affinity_and_file_path() {
+    let tied = [
+        "target/a.rs",
+        "target/b.rs",
+        "target/c.rs",
+        "source/peer.rs",
+    ];
+    let candidates: [(&str, &[&str]); 4] = [
+        ("source/beta.rs", &tied),
+        ("source/alpha.rs", &tied),
+        ("source/focused.rs", &tied[..3]),
+        (
+            "source/broad.rs",
+            &[
+                "target/a.rs",
+                "target/b.rs",
+                "target/c.rs",
+                "target/d.rs",
+                "source/peer.rs",
+                "spare/a.rs",
+            ],
+        ),
+    ];
+    let files: Vec<_> = FILES
+        .iter()
+        .copied()
+        .chain(candidates.iter().map(|&(file, _)| file))
+        .chain(["target/d.rs"])
+        .collect();
+    let edges: Vec<_> = candidates
+        .iter()
+        .flat_map(|&(file, targets)| targets.iter().map(move |&target| (file, target)))
+        .collect();
+
+    let result = recommendations(&files, &edges);
+    let order: Vec<_> = result.iter().map(|entry| entry.file.as_str()).collect();
+    assert_eq!(
+        order,
+        [
+            "source/broad.rs",
+            "source/focused.rs",
+            "source/alpha.rs",
+            "source/beta.rs",
+        ]
+    );
+}
+
+#[test]
+fn self_and_dangling_edges_do_not_change_relocation_recommendations() {
+    let edges = [
+        OUTGOING,
+        &[
+            (MOVER, MOVER),
+            (MOVER, "missing/target.rs"),
+            ("missing/consumer.rs", MOVER),
+        ],
+    ]
+    .concat();
+
+    let result = recommendations(FILES, &edges);
+    let [recommendation] = result.as_slice() else {
+        panic!("expected one recommendation at the affinity boundary, got {result:?}");
+    };
+    assert_eq!(recommendation.file, MOVER);
+    assert_eq!(recommendation.internal_edges, 1);
+    assert!((recommendation.affinity - 0.60).abs() < 1e-9);
+}
