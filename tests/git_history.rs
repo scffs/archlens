@@ -3,6 +3,7 @@ use std::path::Path;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use archlens::report::terminal::render_terminal_summary;
 use archlens::{AnalysisConfig, analyze};
 use tempfile::TempDir;
 
@@ -174,6 +175,11 @@ fn temporal_coupling_prioritizes_hidden_cross_module_changes() {
     }
 
     let report = analyze(&AnalysisConfig::new(root)).expect("analyze Git fixture");
+    let text = render_terminal_summary(&report, Some("files"));
+    assert!(
+        text.contains("6 temporal couplings (4 hidden cross-module)"),
+        "{text}"
+    );
     let history = report.git.expect("Git history");
     assert_eq!(history.active_files, 28);
     let pairs: Vec<_> = history

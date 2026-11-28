@@ -10,15 +10,18 @@ fn terminal_summary_shows_ranked_components_cycles_and_unicode_paths() {
     let root = temp.path();
     let long_path = format!("{}tail.ts", "界".repeat(40));
     for (path, source) in [
+        ("00-isolated.ts", "export function only() {}\n"),
+        ("a-heavy.ts", "export function primary() {}\n"),
+        ("z-light.ts", "export function secondary() {}\n"),
         ("a-light.ts", "export function light() { return 1; }\n"),
         ("z-heavy.ts", "export function heavy() { return 1; }\n"),
         (
             "entry-first.ts",
-            "import { light } from './a-light';\nimport { heavy } from './z-heavy';\nexport function out() { return light + heavy; }\n",
+            "import { light } from './a-light';\nimport { heavy } from './z-heavy';\nimport { primary } from './a-heavy';\nexport function out() { return light + heavy + primary; }\n",
         ),
         (
             "entry-second.ts",
-            "import { heavy } from './z-heavy';\nexport function out() { return heavy; }\n",
+            "import { heavy } from './z-heavy';\nimport { primary } from './a-heavy';\nimport { secondary } from './z-light';\nexport function out() { return heavy + primary + secondary; }\n",
         ),
         (
             "cycle-a.ts",
@@ -40,7 +43,7 @@ fn terminal_summary_shows_ranked_components_cycles_and_unicode_paths() {
     let report = analyze(&config).expect("analyze terminal fixture");
     let text = render_terminal_summary(&report, Some("files"));
 
-    assert!(text.contains("Languages: TypeScript: 7"), "{text}");
+    assert!(text.contains("Languages: TypeScript: 10"), "{text}");
     assert!(text.contains("Dependency cycles"), "{text}");
     assert!(text.contains("cycle-a.ts <-> cycle-b.ts"), "{text}");
     assert!(text.contains("cut suggestion:"), "{text}");
@@ -68,7 +71,10 @@ fn terminal_summary_shows_ranked_components_cycles_and_unicode_paths() {
         ["a-light.ts", "1", "0", "0.00", "0.00", "1.00"]
     );
     assert!(row.contains("pain(calm)"), "{row}");
-    assert!(heavy < light && light < isolated, "{text}");
+    let (cycle, _) = rows("cycle-a.ts");
+    assert!(heavy < light && light < cycle && cycle < isolated, "{text}");
+    assert!(cycle < rows("00-isolated.ts").0, "{text}");
+    assert!(rows("a-heavy.ts").0 < rows("z-light.ts").0, "{text}");
     assert!(isolated_row.contains("isolated"), "{isolated_row}");
     assert_eq!(isolated_row.split_whitespace().nth(5), Some("-"));
 }
