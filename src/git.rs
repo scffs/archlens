@@ -250,6 +250,7 @@ pub fn analyze_git_history(
             .then_with(|| b.strength.total_cmp(&a.strength))
             .then_with(|| b.shared_commits.cmp(&a.shared_commits))
             .then_with(|| a.file_a.cmp(&b.file_a))
+            .then_with(|| a.file_b.cmp(&b.file_b))
     });
     temporal_couplings.truncate(MAX_TEMPORAL_COUPLINGS);
 
