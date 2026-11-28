@@ -10,6 +10,8 @@ cargo-fuzz = true
 [dependencies]
 archlens = { path = ".." }
 libfuzzer-sys = "0.4"
+serde_json = "1.0"
+tempfile = "3.19"
 
 [workspace]
 members = ["."]
@@ -24,6 +26,13 @@ bench = false
 [[bin]]
 name = "analyze_graph"
 path = "fuzz_targets/analyze_graph.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "report_roundtrip"
+path = "fuzz_targets/report_roundtrip.rs"
 test = false
 doc = false
 bench = false
