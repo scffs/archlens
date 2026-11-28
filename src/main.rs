@@ -1,3 +1,5 @@
+use std::fs::File;
+use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -203,10 +205,6 @@ fn run_diff(
 
 fn run_init(dir: &Path) -> archlens::Result<ExitCode> {
     let target = dir.join("archlens.toml");
-    if target.exists() {
-        eprintln!("{} already exists; leaving it untouched.", target.display());
-        return Ok(ExitCode::from(1));
-    }
     let starter = r#"# archlens configuration (optional — works with zero config out of the box)
 
 include_tests = false
@@ -255,7 +253,17 @@ fail_on_rule_violations = false
 # max_zone_of_pain = 2
 # max_propagation_cost = 0.50
 "#;
-    std::fs::write(&target, starter).map_err(|source| archlens::ArchLensError::Io {
+    match File::create_new(&target) {
+        Ok(mut file) => file.write_all(starter.as_bytes()),
+        Err(source)
+            if source.kind() == ErrorKind::AlreadyExists || target.symlink_metadata().is_ok() =>
+        {
+            eprintln!("{} already exists; leaving it untouched.", target.display());
+            return Ok(ExitCode::from(1));
+        }
+        Err(source) => Err(source),
+    }
+    .map_err(|source| archlens::ArchLensError::Io {
         path: target.clone(),
         source,
     })?;
