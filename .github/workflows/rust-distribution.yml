@@ -16,6 +16,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        env:
+          RUSTUP_TOOLCHAIN: stable
+        with:
+          shared-key: archlens-stable
+          cache-bin: 'false'
+          save-if: 'false'
       - name: Build library documentation with warnings denied
         run: cargo +stable rustdoc --locked --lib -- -D warnings
       - name: Package and verify the crate
@@ -31,5 +39,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        env:
+          RUSTUP_TOOLCHAIN: stable
+        with:
+          shared-key: archlens-portability
+          cache-bin: 'false'
+          save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
       - name: Run CLI, configuration, and report contracts
         run: cargo +stable test --locked --test cli_contracts --test config_contracts --test report_contracts

@@ -16,6 +16,14 @@ jobs:
           persist-credentials: false
       - name: Install Rust checking components
         run: rustup component add --toolchain stable rustfmt clippy
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        env:
+          RUSTUP_TOOLCHAIN: stable
+        with:
+          shared-key: archlens-stable
+          cache-bin: 'false'
+          save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
       - name: Check Rust formatting
         run: cargo +stable fmt --all -- --check
       - name: Run strict Clippy
