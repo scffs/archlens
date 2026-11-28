@@ -1,17 +1,7 @@
 use std::collections::BTreeSet;
-use std::path::Path;
 
 use crate::domain::metrics::{AnalysisReport, BaselineDiff, RuleViolation};
-use crate::error::{ArchLensError, Result};
-
-/// Load a previously saved `AnalysisReport` JSON snapshot from disk.
-pub fn load_report_json(path: &Path) -> Result<AnalysisReport> {
-    let raw = std::fs::read_to_string(path).map_err(|source| ArchLensError::Io {
-        path: path.to_path_buf(),
-        source,
-    })?;
-    Ok(serde_json::from_str(&raw)?)
-}
+pub use crate::report::json::load_report_json;
 
 /// Compare `current` against `baseline` for the specified view (or `current.default_view`).
 pub fn compute_baseline_diff(

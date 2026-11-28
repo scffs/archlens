@@ -5,10 +5,10 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 
 use archlens::checks::evaluate_thresholds;
 use archlens::config::AnalysisConfig;
-use archlens::diff::{compute_baseline_diff, load_report_json};
+use archlens::diff::compute_baseline_diff;
 use archlens::domain::model::Language;
 use archlens::report::html::write_html_report;
-use archlens::report::json::write_json_report;
+use archlens::report::json::{load_report_json, write_json_report};
 use archlens::report::terminal::{render_diff_summary, render_terminal_summary};
 
 #[derive(Debug, Parser)]

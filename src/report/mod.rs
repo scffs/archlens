@@ -1,3 +1,5 @@
 pub mod html;
 pub mod json;
 pub mod terminal;
+
+mod output;
