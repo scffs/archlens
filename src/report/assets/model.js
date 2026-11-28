@@ -14,14 +14,19 @@ const ArchModel = (() => {
     return `vscode://file/${encodeURI(abs)}:${line || 1}`;
   }
 
-  // Tarjan SCC on directed graph (ids: string[], edges: {from, to}[])
-  function computeTarjanScc(ids, edges) {
+  function directedAdjacency(ids, edges) {
     const adj = new Map(ids.map(id => [id, []]));
     for (const e of edges) {
       if (adj.has(e.from) && adj.has(e.to) && e.from !== e.to) {
         adj.get(e.from).push(e.to);
       }
     }
+    return adj;
+  }
+
+  // Tarjan SCC on directed graph (ids: string[], edges: {from, to}[])
+  function computeTarjanScc(ids, edges) {
+    const adj = directedAdjacency(ids, edges);
     let idx = 0;
     const indexMap = new Map();
     const lowlink = new Map();
@@ -77,18 +82,13 @@ const ArchModel = (() => {
   function computePropagationCost(ids, edges) {
     const n = ids.length;
     if (n === 0) return 0;
-    const adj = new Map(ids.map(id => [id, []]));
-    for (const e of edges) {
-      if (adj.has(e.from) && adj.has(e.to) && e.from !== e.to) {
-        adj.get(e.from).push(e.to);
-      }
-    }
+    const adj = directedAdjacency(ids, edges);
     let ccd = 0;
     for (const start of ids) {
       const seen = new Set([start]);
       const q = [start];
-      while (q.length > 0) {
-        const cur = q.shift();
+      for (let index = 0; index < q.length; index++) {
+        const cur = q[index];
         for (const nxt of adj.get(cur) || []) {
           if (!seen.has(nxt)) {
             seen.add(nxt);
