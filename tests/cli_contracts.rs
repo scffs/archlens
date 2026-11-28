@@ -72,3 +72,89 @@ fn init_treats_an_existing_dangling_link_as_occupied() {
     assert!(!link_target.exists());
     assert_eq!(fs::read_link(config_path).expect("read link"), link_target);
 }
+
+#[test]
+fn diff_gate_detects_new_cycles_and_rule_violations_independently() {
+    let temp = TempDir::new().expect("tempdir");
+    let root = temp.path();
+    fs::write(root.join("a.ts"), "import './b';\n").expect("write a.ts");
+    fs::write(root.join("b.ts"), "export const b = 1;\n").expect("write b.ts");
+
+    let snapshot = |name| {
+        let path = root.join(name);
+        let output = Command::new(env!("CARGO_BIN_EXE_archlens"))
+            .arg("analyze")
+            .arg(root)
+            .args(["--no-git", "--quiet", "--json"])
+            .arg(&path)
+            .output()
+            .expect("write snapshot");
+        assert!(output.status.success(), "{output:?}");
+        assert!(output.stdout.is_empty(), "{output:?}");
+        path
+    };
+
+    let baseline = snapshot("base.json");
+    fs::write(root.join("b.ts"), "import './a';\n").expect("introduce cycle");
+    let with_cycle = snapshot("cycle.json");
+    fs::write(root.join("b.ts"), "export const b = 1;\n").expect("remove cycle");
+    fs::write(
+        root.join("archlens.toml"),
+        "[[rules]]\nname = 'a-must-not-import-b'\nkind = 'forbid'\nfrom = ['a.ts']\nto = ['b.ts']\n",
+    )
+    .expect("add rule");
+    let with_rule_violation = snapshot("rule.json");
+
+    let diff = |current: &std::path::Path, enforce: bool| {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_archlens"));
+        command
+            .arg("diff")
+            .arg(&baseline)
+            .arg(current)
+            .args(["--view", "files"]);
+        if enforce {
+            command.arg("--fail-on-regression");
+        }
+        command.output().expect("run archlens diff")
+    };
+
+    let unchanged = diff(&baseline, true);
+    assert!(unchanged.status.success(), "{unchanged:?}");
+    assert_eq!(
+        diff(&root.join("missing.json"), true).status.code(),
+        Some(2)
+    );
+    for (current, expected, absent) in [
+        (&with_cycle, "NEW cycles (1)", "NEW rule violations"),
+        (&with_rule_violation, "[a-must-not-import-b]", "NEW cycles"),
+    ] {
+        let enforced = diff(current, true);
+        assert_eq!(enforced.status.code(), Some(1), "{enforced:?}");
+        let stdout = String::from_utf8_lossy(&enforced.stdout);
+        assert!(stdout.contains("Baseline Diff (view: files)"), "{stdout}");
+        assert!(stdout.contains(expected), "{stdout}");
+        assert!(!stdout.contains(absent), "{stdout}");
+        let advisory = diff(current, false);
+        assert!(advisory.status.success(), "{advisory:?}");
+        assert_eq!(advisory.stdout, enforced.stdout);
+    }
+}
+
+#[test]
+fn init_reports_a_missing_project_as_an_io_error() {
+    let temp = TempDir::new().expect("tempdir");
+    let missing = temp.path().join("missing");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_archlens"))
+        .arg("init")
+        .arg(&missing)
+        .output()
+        .expect("run archlens init");
+
+    assert_eq!(output.status.code(), Some(2), "{output:?}");
+    assert!(output.stdout.is_empty(), "{output:?}");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("error:"), "{stderr}");
+    assert!(stderr.contains("archlens.toml"), "{stderr}");
+    assert!(!missing.exists());
+}
