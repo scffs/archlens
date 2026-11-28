@@ -7,7 +7,7 @@ fn rust_parser_preserves_nested_use_symbols_and_qualified_body_references() {
 use super::local::Type;
 impl Runner {
     fn execute(input: crate::model::Input) {
-        use crate::helpers::configure;
+        use crate::helpers::{configure as enable, diagnostics::*};
         if ready() {
             _hooks::run();
             adapters::apply();
@@ -50,6 +50,12 @@ impl Runner {
                 ImportKind::Import,
                 5,
                 vec!["configure"]
+            ),
+            (
+                "crate::helpers::diagnostics::*",
+                ImportKind::Import,
+                5,
+                vec![]
             ),
             ("_hooks::run", ImportKind::Import, 7, vec!["run"]),
             ("adapters::apply", ImportKind::Import, 8, vec!["apply"]),
