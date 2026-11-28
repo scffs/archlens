@@ -28,7 +28,8 @@ test: test-rust test-report
 # Run the Rust tests, optionally passing selectors and flags to Cargo.
 [positional-arguments]
 test-rust *args:
-    cargo +stable test --locked "$@"
+    # Git hooks export repository-specific variables that must not reach temporary test repositories.
+    unset $(git rev-parse --local-env-vars) && cargo +stable test --locked "$@"
 
 # Check report asset syntax and run the Bun tests.
 test-report:
