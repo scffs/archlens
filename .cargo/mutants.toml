@@ -1,3 +1,2 @@
-# Start with path semantics and Go AST extraction, which have focused contract tests.
-examine_globs = ["src/paths.rs", "src/parser/go.rs"]
 additional_cargo_args = ["--locked"]
+additional_cargo_test_args = ["--no-fail-fast"]
