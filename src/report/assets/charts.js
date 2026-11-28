@@ -523,7 +523,7 @@ const ArchCharts = (() => {
                     <a href="${ArchModel.ideUri(report.root_path, fe.from, fe.line)}">${ArchModel.esc(fe.from)}:${fe.line}</a>
                     &rarr; ${ArchModel.esc(fe.to)}
                     ${fe.symbols?.length ? `<span style="color:var(--td-text-color-secondary)">[${ArchModel.esc(fe.symbols.slice(0, 3).join(', '))}]</span>` : ''}
-                    <button class="sm" data-sim-cut="${ArchModel.esc(fe.from)}→${ArchModel.esc(fe.to)}">Убрать в симуляции</button>
+                    <button class="sm" data-sim-cut="${ArchModel.esc(ArchModel.edgeKey(fe.from, fe.to))}">Убрать в симуляции</button>
                   </div>
                 `).join('')}
               </div>

@@ -239,7 +239,7 @@ const ArchLayout = (() => {
       const a = lift(e.from);
       const b = lift(e.to);
       if (a && b && a !== b) {
-        const k = `${a}→${b}`;
+        const k = ArchModel.edgeKey(a, b);
         if (!seen.has(k)) {
           seen.add(k);
           lifted.push({ from: a, to: b });

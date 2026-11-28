@@ -349,7 +349,7 @@ const ArchGraph = (() => {
       for (const p of appState.pathResults) {
         for (let i = 0; i < p.length; i++) {
           nodeSet.add(p[i]);
-          if (i + 1 < p.length) pathEdgeKeys.add(`${p[i]}→${p[i + 1]}`);
+          if (i + 1 < p.length) pathEdgeKeys.add(ArchModel.edgeKey(p[i], p[i + 1]));
         }
       }
       return { hasHighlight: true, nodeSet, pathEdgeKeys, focusId: null };
@@ -445,7 +445,7 @@ const ArchGraph = (() => {
     const drawEdgePass = highlightPass => {
       for (const eg of g.edgeGeoms) {
         const e = eg.edge;
-        const isPath = pathEdgeKeys.has(`${e.from}→${e.to}`);
+        const isPath = pathEdgeKeys.has(e.id);
         const isSelectedEdge = e.id === appState.selectedEdgeId;
         const isHoveredEdge = e.id === g.hoverEdgeId;
         const isIncident = focusId && (e.from === focusId || e.to === focusId);

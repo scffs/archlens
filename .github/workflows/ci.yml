@@ -22,3 +22,5 @@ jobs:
           do
             node --check "$asset"
           done
+      - name: Test report graph and simulation behavior
+        run: node --test tests/*.test.js
