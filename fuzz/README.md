@@ -18,5 +18,8 @@ CI discovers every target with `cargo +nightly fuzz list` and requires a seed di
 | --- | --- |
 | `parse_source` | One selector byte followed by UTF-8 source. Seeds cover Go, Rust, JavaScript, TypeScript, TSX, Python, and Vue. |
 | `analyze_graph` | The first byte modulo 13 selects how many file descriptor bytes follow. Each descriptor determines a language, folder, and line count. Remaining triples select source and destination indices and import kind. Seeds cover an empty graph, a chain, a cycle, and disconnected components. |
+| `report_roundtrip` | The first byte modulo 33 is the length of a project label. Label bytes precede the graph encoding from `analyze_graph`. Seeds include Unicode and quoted labels and empty, cyclic, and disconnected graphs. |
 
 `analyze_graph` generates valid graphs and checks report totals, view edges, DSM membership, cycle membership, and reachability metrics. The reference calculation uses a small reachability matrix.
+
+`report_roundtrip` writes and reads a JSON snapshot, checks that each restored view has an empty baseline diff, and compares the JSON data embedded in the HTML export with the standalone JSON export.
