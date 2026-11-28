@@ -4,7 +4,7 @@ use std::path::Path;
 use crate::domain::model::ParsedFile;
 use crate::language::Language;
 use crate::parser::{LanguageParser, builtin_parser};
-use crate::resolver::{ImportResolver, builtin_resolver};
+use crate::resolver::ImportResolver;
 
 /// Extensions supplied by the caller for a single analysis pipeline.
 #[derive(Default)]
@@ -87,11 +87,10 @@ impl<'a> AnalysisPlugins<'a> {
         }
     }
 
-    pub(crate) fn resolver(&self, file: &ParsedFile) -> &dyn ImportResolver {
+    pub(crate) fn resolver(&self, file: &ParsedFile) -> Option<&dyn ImportResolver> {
         source_extension(Path::new(&file.path))
             .and_then(|extension| self.source_resolvers.get(&extension).copied())
             .or_else(|| self.resolvers.get(&file.language).copied())
-            .unwrap_or_else(|| builtin_resolver(file))
     }
 
     pub(crate) fn language_for_extension(&self, extension: &str) -> Option<Language> {

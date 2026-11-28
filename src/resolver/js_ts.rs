@@ -1,18 +1,14 @@
+pub(super) mod imports;
+
+pub use self::imports::{AliasFallback, resolve_js_ts_import_with_aliases};
+pub use crate::resolver::web_defaults::resolve_js_ts_import;
+
 use std::path::Path;
 
 use serde_json::Value;
 
-use crate::language::js_ts_extensions;
-use crate::paths::{join_posix, normalize_rel_path, parent_dir, path_is_under};
-use crate::resolver::index::{JsPackageInfo, PackageManifest, ProjectIndex, ResolveOutcome, TsConfigInfo};
-
-const NUXT_SHARED_ALIAS: &str = "#shared/";
-
-const NON_CODE_ASSET_EXTENSIONS: &[&str] = &[
-    "css", "scss", "sass", "less", "styl", "pcss", "svg", "png", "jpg", "jpeg", "gif", "webp",
-    "avif", "ico", "woff", "woff2", "ttf", "eot", "otf", "json", "yaml", "yml", "toml", "md",
-    "mdx", "txt", "html", "wasm", "mp4", "webm", "mp3", "wav",
-];
+use crate::paths::{join_posix, normalize_rel_path};
+use crate::resolver::index::{JsPackageInfo, PackageManifest, TsConfigInfo};
 
 /// Load a `package.json` manifest for monorepo package detection and cross-package resolution.
 pub fn load_package_json(abs_path: &Path, dir: &str) -> Option<(PackageManifest, JsPackageInfo)> {
@@ -71,7 +67,7 @@ fn collect_export_entries(exports: &Value, out: &mut Vec<String>) {
 }
 
 /// Load a `tsconfig.json` / `jsconfig.json`, supporting JSONC, `extends`, and project `references`
-/// (such as Nuxt 4 `.nuxt/tsconfig.app.json`).
+/// (including generated configs explicitly referenced by the project).
 pub fn load_tsconfig(root: &Path, abs_path: &Path, dir: &str) -> Option<TsConfigInfo> {
     let mut base_dir: Option<String> = None;
     let mut paths: Vec<(String, Vec<String>)> = Vec::new();
@@ -128,7 +124,7 @@ fn load_tsconfig_chain(
         }
     }
 
-    // Follow project `references` (e.g. Nuxt 4 `./.nuxt/tsconfig.app.json`, Vite `tsconfig.app.json`).
+    // Follow explicitly referenced configs, including generated files.
     if let Some(refs) = json.get("references").and_then(Value::as_array)
         && let Some(parent) = abs_path.parent()
     {
@@ -179,209 +175,6 @@ fn load_tsconfig_chain(
             }
         }
     }
-}
-
-/// Resolve a JS, TS, JSX, TSX, or Vue import specifier.
-pub fn resolve_js_ts_import(
-    index: &ProjectIndex,
-    from_file: &str,
-    raw_specifier: &str,
-) -> ResolveOutcome {
-    let raw_specifier = raw_specifier.trim_start();
-    // For the Nuxt shared alias, the first hash is part of the path.
-    let suffix_search_start = usize::from(raw_specifier.starts_with(NUXT_SHARED_ALIAS));
-    let clean = raw_specifier[suffix_search_start..]
-        .find(['?', '#'])
-        .map_or(raw_specifier, |index| &raw_specifier[..suffix_search_start + index])
-        .trim_end();
-
-    if clean.is_empty() || clean.starts_with("http://") || clean.starts_with("https://") {
-        return ResolveOutcome::External(clean.to_string());
-    }
-
-    if is_non_code_asset(clean) {
-        return ResolveOutcome::External(format!("asset:{clean}"));
-    }
-
-    // 1. Relative path (`./...` or `../...`)
-    if clean.starts_with("./") || clean.starts_with("../") || clean == "." || clean == ".." {
-        let dir = parent_dir(from_file);
-        let candidate = join_posix(&dir, clean);
-        if let Some(found) = try_resolve_file_candidate(index, &candidate) {
-            return ResolveOutcome::Internal(found);
-        }
-        return ResolveOutcome::Unresolved(clean.to_string());
-    }
-
-    // 2. Nearest enclosing tsconfig `paths` and `baseUrl`
-    for tsconfig in &index.tsconfigs {
-        if !path_is_under(from_file, &tsconfig.dir) {
-            continue;
-        }
-        for (pattern, replacements) in &tsconfig.paths {
-            if let Some(matched_wildcard) = match_tsconfig_pattern(pattern, clean) {
-                for repl in replacements {
-                    let candidate = repl.replace('*', matched_wildcard);
-                    if let Some(found) = try_resolve_file_candidate(index, &candidate) {
-                        return ResolveOutcome::Internal(found);
-                    }
-                }
-            }
-        }
-        if tsconfig.has_base_url {
-            let candidate = join_posix(&tsconfig.base_dir, clean);
-            if let Some(found) = try_resolve_file_candidate(index, &candidate) {
-                return ResolveOutcome::Internal(found);
-            }
-        }
-        break;
-    }
-
-    // 3. Common Vite / Nuxt 4 / Vue aliases (`@/`, `~/`, `@@/`, `~~/`, `#shared/`)
-    let pkg_dir = index
-        .enclosing_package(from_file)
-        .map_or("", |p| p.dir.as_str());
-
-    if let Some(rest) = clean.strip_prefix(NUXT_SHARED_ALIAS) {
-        let candidate = join_posix(&join_posix(pkg_dir, "shared"), rest);
-        if let Some(found) = try_resolve_file_candidate(index, &candidate) {
-            return ResolveOutcome::Internal(found);
-        }
-        return ResolveOutcome::Unresolved(clean.to_string());
-    }
-
-    if let Some(rest) = clean
-        .strip_prefix("@@/")
-        .or_else(|| clean.strip_prefix("~~/"))
-    {
-        let candidate = join_posix(pkg_dir, rest);
-        if let Some(found) = try_resolve_file_candidate(index, &candidate) {
-            return ResolveOutcome::Internal(found);
-        }
-        return ResolveOutcome::Unresolved(clean.to_string());
-    }
-
-    if let Some(rest) = clean
-        .strip_prefix("@/")
-        .or_else(|| clean.strip_prefix("~/"))
-    {
-        for base in [
-            join_posix(pkg_dir, "app"),
-            join_posix(pkg_dir, "src"),
-            pkg_dir.to_string(),
-        ] {
-            let candidate = join_posix(&base, rest);
-            if let Some(found) = try_resolve_file_candidate(index, &candidate) {
-                return ResolveOutcome::Internal(found);
-            }
-        }
-        return ResolveOutcome::Unresolved(clean.to_string());
-    }
-
-    // 4. Monorepo workspace package imports (`@scope/pkg` or `@scope/pkg/subpath`)
-    let pkg_name = extract_npm_package_name(clean);
-    if let Some(pkg) = index.js_packages.get(pkg_name) {
-        if clean == pkg_name {
-            for entry in &pkg.entry_candidates {
-                let candidate = join_posix(&pkg.dir, entry);
-                if let Some(found) = try_resolve_file_candidate(index, &candidate) {
-                    return ResolveOutcome::Internal(found);
-                }
-            }
-        } else if let Some(subpath) = clean.strip_prefix(&format!("{pkg_name}/")) {
-            for base in [
-                join_posix(&pkg.dir, subpath),
-                join_posix(&join_posix(&pkg.dir, "src"), subpath),
-            ] {
-                if let Some(found) = try_resolve_file_candidate(index, &base) {
-                    return ResolveOutcome::Internal(found);
-                }
-            }
-        }
-        for entry in &pkg.entry_candidates {
-            let candidate = join_posix(&pkg.dir, entry);
-            if let Some(found) = try_resolve_file_candidate(index, &candidate) {
-                return ResolveOutcome::Internal(found);
-            }
-        }
-    }
-
-    ResolveOutcome::External(pkg_name.to_string())
-}
-
-fn try_resolve_file_candidate(index: &ProjectIndex, candidate: &str) -> Option<String> {
-    if index.known_files.contains(candidate) {
-        return Some(candidate.to_string());
-    }
-
-    for (from_ext, replacements) in [
-        (".js", &[".ts", ".tsx", ".mts", ".vue"][..]),
-        (".jsx", &[".tsx", ".ts"][..]),
-        (".mjs", &[".mts", ".ts"][..]),
-        (".cjs", &[".cts", ".ts"][..]),
-    ] {
-        if let Some(stem) = candidate.strip_suffix(from_ext) {
-            for repl in replacements {
-                let alt = format!("{stem}{repl}");
-                if index.known_files.contains(&alt) {
-                    return Some(alt);
-                }
-            }
-        }
-    }
-
-    for ext in js_ts_extensions() {
-        let with_ext = format!("{candidate}.{ext}");
-        if index.known_files.contains(&with_ext) {
-            return Some(with_ext);
-        }
-    }
-
-    for ext in js_ts_extensions() {
-        let index_file = join_posix(candidate, &format!("index.{ext}"));
-        if index.known_files.contains(&index_file) {
-            return Some(index_file);
-        }
-    }
-
-    None
-}
-
-fn match_tsconfig_pattern<'a>(pattern: &str, specifier: &'a str) -> Option<&'a str> {
-    if let Some((prefix, suffix)) = pattern.split_once('*') {
-        if specifier.starts_with(prefix)
-            && specifier.ends_with(suffix)
-            && specifier.len() >= prefix.len() + suffix.len()
-        {
-            return Some(&specifier[prefix.len()..specifier.len() - suffix.len()]);
-        }
-        None
-    } else if pattern == specifier {
-        Some("")
-    } else {
-        None
-    }
-}
-
-fn extract_npm_package_name(specifier: &str) -> &str {
-    if specifier.starts_with('@') {
-        let mut parts = specifier.splitn(3, '/');
-        if let (Some(scope), Some(name)) = (parts.next(), parts.next()) {
-            let len = scope.len() + 1 + name.len();
-            return &specifier[..len];
-        }
-    }
-    specifier.split('/').next().unwrap_or(specifier)
-}
-
-fn is_non_code_asset(specifier: &str) -> bool {
-    let Some((_, ext)) = specifier.rsplit_once('.') else {
-        return false;
-    };
-    if ext.contains('/') {
-        return false;
-    }
-    NON_CODE_ASSET_EXTENSIONS.contains(&ext.to_ascii_lowercase().as_str())
 }
 
 /// Strip `//` line comments, `/* ... */` block comments, and trailing commas from JSONC text.

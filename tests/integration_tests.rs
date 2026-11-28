@@ -551,14 +551,31 @@ fn resolves_unicode_tsconfig_aliases_with_comments_and_trailing_commas() {
 }
 
 #[test]
-fn resolves_nuxt_shared_alias_before_discarding_import_suffixes() {
+fn configured_aliases_and_nuxt_fallbacks_have_separate_scopes() {
     let temp = TempDir::new().expect("tempdir");
     let root = temp.path();
     write_fixture(root, "site/package.json", r#"{ "name": "site" }"#);
+    write_fixture(root, "site/nuxt.config.ts", "export default {};");
+    write_fixture(root, "plain/package.json", r#"{ "name": "plain" }"#);
+    write_fixture(root, "plain/entry.ts", "import '#shared/found';");
+    write_fixture(root, "plain/shared/found.ts", "export function found() {}");
     write_fixture(
         root,
         "site/tsconfig.json",
-        r##"{ "compilerOptions": { "paths": { "#shared/from-config": ["mapped.ts"] } } }"##,
+        r##"{
+  "references": [{ "path": "./.nuxt/tsconfig.app.json" }],
+  "compilerOptions": { "paths": { "#shared/from-config": ["mapped.ts"] } }
+}"##,
+    );
+    write_fixture(
+        root,
+        "site/.nuxt/tsconfig.app.json",
+        r##"{ "compilerOptions": { "paths": {
+  "#imports": ["./imports"],
+  "#app/*": ["../node_modules/nuxt/dist/app/*"],
+  "#custom/*": ["../custom/*"],
+  "feature/*": ["../custom/*"]
+} } }"##,
     );
     write_fixture(
         root,
@@ -566,7 +583,11 @@ fn resolves_nuxt_shared_alias_before_discarding_import_suffixes() {
         r"import '#shared/found?query#fragment';
 import '#shared/from-config';
 import '#shared/missing';
+import '#server/route';
+import '#custom/hash';
+import 'feature/plain';
 import '#imports';
+import '#app/composables';
 import './local#fragment';
 import './styles.css?inline';
 ",
@@ -576,11 +597,15 @@ import './styles.css?inline';
         "site/shared/from-config.ts",
         "site/mapped.ts",
         "site/app/local.ts",
+        "site/custom/hash.ts",
+        "site/custom/plain.ts",
+        "site/server/route.ts",
     ] {
         write_fixture(root, path, "export const value = 1;\n");
     }
     let mut config = AnalysisConfig::new(root);
     config.git.enabled = false;
+    config.exclude.push("**/nuxt.config.ts".into());
     let report = analyze(&config).expect("analyze Nuxt fixture");
     let entry = report
         .file_graph
@@ -600,10 +625,14 @@ import './styles.css?inline';
         targets,
         [
             "site/app/local.ts",
+            "site/custom/hash.ts",
+            "site/custom/plain.ts",
             "site/mapped.ts",
+            "site/server/route.ts",
             "site/shared/found.ts"
         ]
     );
     assert_eq!(entry.unresolved_imports, ["#shared/missing"]);
     assert_eq!(entry.external_imports, ["asset:./styles.css"]);
+    assert!(!report.file_graph.edges.iter().any(|edge| edge.from == "plain/entry.ts"));
 }

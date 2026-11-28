@@ -66,12 +66,13 @@ pub fn analyze_with_plugins(
         parsed_files.push(parsed);
     }
 
+    let resolvers = resolver::BuiltinResolvers::new(&config.root);
     let mut file_graph = resolver::resolve_file_graph_with(
         &config.root,
         &parsed_files,
         config.include_mod_decls,
         config.include_tests,
-        |file| plugins.resolver(file),
+        |file| plugins.resolver(file).unwrap_or_else(|| resolvers.for_file(file)),
     );
 
     let git_analysis = if config.git.enabled {
