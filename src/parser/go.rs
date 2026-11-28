@@ -15,7 +15,7 @@ impl LanguageParser for GoParser {
         let mut raw_imports = Vec::new();
         let mut declarations = Vec::new();
 
-        if let Some(tree) = parse_tree(tree_sitter_go::LANGUAGE.into(), "go", source)? {
+        if let Some(tree) = parse_tree(&tree_sitter_go::LANGUAGE.into(), "go", source)? {
             walk_go_root(
                 tree.root_node(),
                 source,

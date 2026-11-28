@@ -26,7 +26,7 @@ impl LanguageParser for RustParser {
             implemented_traits: Vec::new(),
         };
 
-        if let Some(tree) = parse_tree(tree_sitter_rust::LANGUAGE.into(), "rust", source)? {
+        if let Some(tree) = parse_tree(&tree_sitter_rust::LANGUAGE.into(), "rust", source)? {
             walk_items(tree.root_node(), source, &mut state);
         }
 

@@ -13,7 +13,7 @@ impl LanguageParser for PythonParser {
         let mut raw_imports = Vec::new();
         let mut declarations = Vec::new();
 
-        if let Some(tree) = parse_tree(tree_sitter_python::LANGUAGE.into(), "python", source)? {
+        if let Some(tree) = parse_tree(&tree_sitter_python::LANGUAGE.into(), "python", source)? {
             let root = tree.root_node();
             collect_top_level_symbols(root, source, &mut declarations);
             collect_all_imports(root, source, &mut raw_imports);

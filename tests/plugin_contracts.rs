@@ -38,7 +38,7 @@ fn registered_extension_and_parser_work_through_the_analysis_entry_point() {
 
     let baseline = analyze(&config).expect("analyze with defaults");
     assert_eq!(baseline.total_files, 1);
-    assert!(baseline.file_graph.edges.is_empty());
+    assert_eq!(baseline.file_graph.edges, [] as [archlens::FileEdge; 0]);
 
     let mut plugins = AnalysisPlugins::default();
     plugins.register_source(".rule", Language::TypeScript, &RuleParser);
@@ -63,7 +63,7 @@ fn registered_extension_and_parser_work_through_the_analysis_entry_point() {
             .iter()
             .any(|symbol| symbol.name == "target")
     );
-    assert!(target.unresolved_imports.is_empty());
+    assert_eq!(target.unresolved_imports, [] as [String; 0]);
 }
 
 struct FacadeResolver;
@@ -91,6 +91,18 @@ impl archlens::resolver::ImportResolver for FacadeResolver {
     }
 }
 
+struct EmptyResolver;
+impl archlens::resolver::ImportResolver for EmptyResolver {
+    fn resolve(
+        &self,
+        _index: &archlens::resolver::ProjectIndex,
+        _from: &str,
+        _import: &RawImport,
+    ) -> archlens::resolver::ResolveOutcome {
+        archlens::resolver::ResolveOutcome::External(String::new())
+    }
+}
+
 #[test]
 fn registered_resolver_builds_and_uses_the_reexport_index() {
     let temp = TempDir::new().expect("tempdir");
@@ -112,18 +124,6 @@ fn registered_resolver_builds_and_uses_the_reexport_index() {
     let report = analyze_with_plugins(&config, &plugins).expect("analyze with custom resolution");
 
     assert_eq!(report.unresolved_import_count, 1);
-
-    struct EmptyResolver;
-    impl archlens::resolver::ImportResolver for EmptyResolver {
-        fn resolve(
-            &self,
-            _index: &archlens::resolver::ProjectIndex,
-            _from: &str,
-            _import: &RawImport,
-        ) -> archlens::resolver::ResolveOutcome {
-            archlens::resolver::ResolveOutcome::External(String::new())
-        }
-    }
 
     let parser = archlens::parser::js_ts::JsTsParser::typescript(false);
     plugins.register_source("ts", Language::Go, &RuleParser);
