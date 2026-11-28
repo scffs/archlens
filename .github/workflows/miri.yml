@@ -1,0 +1,33 @@
+name: Miri
+
+'on':
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  miri:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      MIRI_TOOLCHAIN: nightly-2026-07-12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Miri and prepare its sysroot
+        run: |
+          rustup toolchain install "$MIRI_TOOLCHAIN" --profile minimal --component miri,rust-src
+          cargo +"$MIRI_TOOLCHAIN" miri setup
+      - name: Test configuration
+        # These tests read and write temporary files on the runner.
+        env:
+          MIRIFLAGS: -Zmiri-disable-isolation
+        run: cargo +"$MIRI_TOOLCHAIN" miri test --locked --test config_contracts
+      - name: Test resolver precedence
+        # This case constructs its index in memory and does not call native Tree-sitter.
+        run: >-
+          cargo +"$MIRI_TOOLCHAIN" miri test --locked --test resolver_contracts
+          javascript_family_resolution_preserves_file_and_extension_precedence -- --exact
