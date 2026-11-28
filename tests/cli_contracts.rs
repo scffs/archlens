@@ -158,3 +158,43 @@ fn init_reports_a_missing_project_as_an_io_error() {
     assert!(stderr.contains("archlens.toml"), "{stderr}");
     assert!(!missing.exists());
 }
+
+#[test]
+fn analyze_applies_cli_filters_and_announces_the_html_report() {
+    let temp = TempDir::new().expect("temporary project");
+    let root = temp.path();
+    fs::write(root.join("keep.rs"), "pub fn keep() {}").expect("write Rust source");
+    fs::write(root.join("skip.rs"), "pub fn skip() {}").expect("write excluded source");
+    fs::write(root.join("also.ts"), "export function other() {}").expect("write TypeScript");
+
+    let html = root.join("report.html");
+    let json = root.join("report.json");
+    let output = Command::new(env!("CARGO_BIN_EXE_archlens"))
+        .arg("analyze")
+        .arg(root)
+        .args([
+            "--lang",
+            "rust",
+            "--exclude",
+            "skip.rs",
+            "--no-git",
+            "--html",
+        ])
+        .arg(&html)
+        .arg("--json")
+        .arg(&json)
+        .output()
+        .expect("run archlens analyze");
+
+    assert!(output.status.success(), "{output:?}");
+    assert!(html.is_file());
+    assert!(String::from_utf8_lossy(&output.stdout).contains("HTML report written to"));
+    let report = archlens::diff::load_report_json(&json).expect("read report");
+    let paths: Vec<_> = report
+        .file_graph
+        .files
+        .iter()
+        .map(|file| file.path.as_str())
+        .collect();
+    assert_eq!(paths, ["keep.rs"]);
+}

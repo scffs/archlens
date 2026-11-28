@@ -73,3 +73,34 @@ fn referenced_config_paths_keep_their_own_base_directory() {
     assert_eq!(edge.from, "site/entry.ts");
     assert_eq!(edge.to, "site/features/report.ts");
 }
+
+#[test]
+fn standalone_graph_resolution_keeps_type_and_abstract_dependencies_distinct() {
+    use archlens::parser::parse_source;
+    use archlens::resolver::resolve_file_graph;
+    use archlens::{ImportKind, Language};
+
+    let temp = tempfile::TempDir::new().expect("temporary repository");
+    let files = [
+        ("data.ts", "export type Data = string;"),
+        ("port.ts", "export interface Port { run(): void; }"),
+        ("mixed.ts", "export interface Request { key: string }\nexport function send() {}"),
+        ("entry.ts", "import type { Data } from './data';\nimport { Port } from './port';\nimport { Request, send } from './mixed';"),
+    ]
+    .map(|(path, source)| parse_source(path, source, Language::TypeScript, false).expect("parse fixture"));
+
+    let graph = resolve_file_graph(temp.path(), &files, false, false);
+    let edges: Vec<_> = graph
+        .edges
+        .iter()
+        .map(|edge| (edge.from.as_str(), edge.to.as_str(), edge.kind, edge.is_dip))
+        .collect();
+    assert_eq!(
+        edges,
+        [
+            ("entry.ts", "data.ts", ImportKind::TypeOnly, true),
+            ("entry.ts", "mixed.ts", ImportKind::Import, false),
+            ("entry.ts", "port.ts", ImportKind::Import, true),
+        ]
+    );
+}

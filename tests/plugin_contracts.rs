@@ -224,3 +224,41 @@ fn additional_views_work_with_scanned_and_prebuilt_graphs() {
             .expect("analyze prebuilt graph with view");
     assert!(prebuilt.view("custom-view").is_some());
 }
+
+#[test]
+fn language_parser_override_preserves_the_report_identity_and_totals() {
+    let temp = TempDir::new().expect("temporary project");
+    let root = temp.path().join("analysis-fixture");
+    fs::create_dir(&root).expect("create source directory");
+    for (path, source) in [
+        (
+            "entry.js",
+            "export function start() {}\nexport function pickup() {}\n",
+        ),
+        ("worker.js", "export function work() {}\n"),
+        ("target.ts", "export function target() {}\n"),
+    ] {
+        fs::write(root.join(path), source).expect("write fixture file");
+    }
+
+    let mut config = AnalysisConfig::new(&root);
+    config.git.enabled = false;
+    let mut plugins = AnalysisPlugins::default();
+    plugins.register_parser(Language::JavaScript, &RuleParser);
+    let report = analyze_with_plugins(&config, &plugins).expect("run registered language parser");
+
+    assert_eq!(report.project_name, "analysis-fixture");
+    assert_eq!((report.total_files, report.total_loc), (3, 4));
+    assert_eq!(report.language_counts[&Language::JavaScript], 2);
+    assert_eq!(report.language_counts[&Language::TypeScript], 1);
+    let edges: Vec<_> = report
+        .file_graph
+        .edges
+        .iter()
+        .map(|e| (e.from.as_str(), e.to.as_str()))
+        .collect();
+    assert_eq!(
+        edges,
+        [("entry.js", "target.ts"), ("worker.js", "target.ts")]
+    );
+}
