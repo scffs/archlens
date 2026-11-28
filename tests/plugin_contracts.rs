@@ -104,6 +104,24 @@ impl archlens::resolver::ImportResolver for EmptyResolver {
 }
 
 #[test]
+fn resolver_default_does_not_exclude_source_files() {
+    use archlens::resolver::ImportResolver as _;
+
+    let source = parse_source(
+        "entry.ts",
+        "import './target';",
+        Language::TypeScript,
+        false,
+    )
+    .expect("parse importer");
+    let known_files = [source.path.clone(), "target.ts".to_owned()].into();
+    assert_eq!(
+        FacadeResolver.test_only_files(&known_files, &source),
+        [] as [String; 0]
+    );
+}
+
+#[test]
 fn registered_resolver_builds_and_uses_the_reexport_index() {
     let temp = TempDir::new().expect("tempdir");
     for (path, source) in [
