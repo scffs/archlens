@@ -4,8 +4,14 @@ const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
 
-const modelSource = fs.readFileSync(path.join(__dirname, '../src/report/assets/model.js'), 'utf8');
-const model = vm.runInNewContext(modelSource + '\nArchModel');
+const modelPath = path.join(__dirname, '../src/report/assets/model.js');
+const modelSource = fs.readFileSync(modelPath, 'utf8');
+// The Stryker command runner activates instrumented code through this environment key.
+const activeMutant = process.env.__STRYKER_ACTIVE_MUTANT__;
+const context = activeMutant === undefined
+  ? {}
+  : { process: { env: { __STRYKER_ACTIVE_MUTANT__: activeMutant } } };
+const model = vm.runInNewContext(modelSource + '\nArchModel', context, { filename: modelPath });
 
 function sourceFile(filePath, moduleId = filePath) {
   return { path: filePath, module_id: moduleId, language: 'javascript' };
