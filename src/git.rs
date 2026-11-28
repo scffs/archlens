@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::process::Command;
 
-use serde::{Deserialize, Serialize};
+pub use crate::domain::model::{GitAnalysis, TemporalCoupling};
 
 use crate::domain::model::{FileGitMetrics, FileGraph};
 
@@ -10,33 +10,6 @@ const MAX_FILES_PER_COCHANGE_COMMIT: usize = 25;
 const MIN_COCHANGE_COMMITS: usize = 3;
 const MIN_TEMPORAL_COUPLING_STRENGTH: f64 = 0.35;
 const MAX_TEMPORAL_COUPLINGS: usize = 80;
-
-/// Pair of files that frequently change together in the same Git commits.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TemporalCoupling {
-    pub file_a: String,
-    pub file_b: String,
-    pub module_a: String,
-    pub module_b: String,
-    pub shared_commits: usize,
-    pub commits_a: usize,
-    pub commits_b: usize,
-    /// Symmetric coupling strength `2 * shared / (commits_a + commits_b)` in `0.0..=1.0`.
-    pub strength: f64,
-    /// True if a direct static import edge exists between `file_a` and `file_b`.
-    pub has_static_edge: bool,
-    /// True if `file_a` and `file_b` belong to different architectural modules.
-    pub cross_module: bool,
-}
-
-/// Repository-level Git behavioral analysis metadata.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GitAnalysis {
-    pub lookback_days: u32,
-    pub commits_analyzed: usize,
-    pub active_files: usize,
-    pub temporal_couplings: Vec<TemporalCoupling>,
-}
 
 struct FileAccumulator {
     commits: usize,

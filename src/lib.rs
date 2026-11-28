@@ -13,6 +13,7 @@ pub mod report;
 pub mod resolver;
 pub mod scanner;
 
+mod language;
 mod paths;
 
 use std::collections::BTreeMap;
@@ -27,11 +28,10 @@ pub use domain::metrics::{
     SdpViolation, ViewEdge, ViewSummary,
 };
 pub use domain::model::{
-    FileEdge, FileGitMetrics, FileGraph, FileNode, ImportKind, Language, SymbolCounts, SymbolDecl,
-    SymbolKind, Visibility,
+    FileEdge, FileGitMetrics, FileGraph, FileNode, GitAnalysis, ImportKind, Language, SymbolCounts,
+    SymbolDecl, SymbolKind, TemporalCoupling, Visibility,
 };
 pub use error::{ArchLensError, Result};
-pub use git::{GitAnalysis, TemporalCoupling};
 
 /// Scan, parse, resolve, enrich with Git history, and compute all architecture views & metrics.
 pub fn analyze(config: &AnalysisConfig) -> Result<AnalysisReport> {

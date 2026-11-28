@@ -1,51 +1,6 @@
-use std::fmt;
-
 use serde::{Deserialize, Serialize};
 
-/// Supported programming languages for AST-based dependency and abstraction analysis.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Language {
-    Rust,
-    TypeScript,
-    JavaScript,
-    Vue,
-    Python,
-    Go,
-}
-
-impl Language {
-    /// Detect language from a file extension (case-insensitive).
-    pub fn from_extension(ext: &str) -> Option<Self> {
-        match ext.to_ascii_lowercase().as_str() {
-            "rs" => Some(Self::Rust),
-            "ts" | "tsx" | "mts" | "cts" => Some(Self::TypeScript),
-            "js" | "jsx" | "mjs" | "cjs" => Some(Self::JavaScript),
-            "vue" => Some(Self::Vue),
-            "py" | "pyi" => Some(Self::Python),
-            "go" => Some(Self::Go),
-            _ => None,
-        }
-    }
-
-    /// Human-readable label shown in reports.
-    pub fn display_name(self) -> &'static str {
-        match self {
-            Self::Rust => "Rust",
-            Self::TypeScript => "TypeScript",
-            Self::JavaScript => "JavaScript",
-            Self::Vue => "Vue",
-            Self::Python => "Python",
-            Self::Go => "Go",
-        }
-    }
-}
-
-impl fmt::Display for Language {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.display_name())
-    }
-}
+pub use crate::language::Language;
 
 /// Kind of symbol declared at top level in a source file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -180,6 +135,33 @@ pub struct ParsedFile {
     /// Trait or interface names implemented inside this file `(name, line)`.
     #[serde(default)]
     pub implemented_traits: Vec<(String, usize)>,
+}
+
+/// Pair of files that frequently change together in the same Git commits.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TemporalCoupling {
+    pub file_a: String,
+    pub file_b: String,
+    pub module_a: String,
+    pub module_b: String,
+    pub shared_commits: usize,
+    pub commits_a: usize,
+    pub commits_b: usize,
+    /// Symmetric coupling strength `2 * shared / (commits_a + commits_b)` in `0.0..=1.0`.
+    pub strength: f64,
+    /// True if a direct static import edge exists between `file_a` and `file_b`.
+    pub has_static_edge: bool,
+    /// True if `file_a` and `file_b` belong to different architectural modules.
+    pub cross_module: bool,
+}
+
+/// Repository-level Git behavioral analysis metadata.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitAnalysis {
+    pub lookback_days: u32,
+    pub commits_analyzed: usize,
+    pub active_files: usize,
+    pub temporal_couplings: Vec<TemporalCoupling>,
 }
 
 /// Git behavioral metrics collected per file when analyzing a Git repository.
