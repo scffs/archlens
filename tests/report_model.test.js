@@ -55,3 +55,44 @@ test('visible edges with an arrow in a module ID stay distinct', () => {
   assert.equal(graph.edges[0].weight, 1);
   assert.equal(graph.edges[1].weight, 1);
 });
+
+test('an explicitly zero Main Sequence band is used in the projected graph', () => {
+  const target = sourceFile('core.js');
+  target.symbols = { abstract_declarations: 3, concrete_declarations: 1 };
+  const report = {
+    main_sequence_band: 0,
+    file_graph: {
+      files: [sourceFile('entry.js'), target],
+      edges: [{ from: 'entry.js', to: target.path }],
+    },
+  };
+
+  const hierarchy = model.buildHierarchy(report);
+  const graph = model.projectCompoundGraph(hierarchy, { expandedIds: new Set(), report });
+  const core = graph.nodes.find(node => node.id === 'mod:core.js');
+
+  assert.equal(core.metrics.distance, 0.25);
+  assert.equal(core.metrics.zone, 'zone_of_pain');
+});
+
+test('an explicitly zero SDP tolerance is used in both report graph and simulation', () => {
+  const edges = [
+    { from: 'source', to: 'target' },
+    { from: 'source', to: 'source-dependency' },
+    { from: 'source-caller', to: 'source' },
+    { from: 'target-caller', to: 'target' },
+    ...Array.from({ length: 5 }, (_, i) => ({ from: 'target', to: 'target-dependency-' + i })),
+  ];
+  const paths = new Set(edges.flatMap(edge => [edge.from, edge.to]));
+  const report = {
+    sdp_tolerance: 0,
+    file_graph: { files: [...paths].map(file => sourceFile(file)), edges },
+  };
+
+  const hierarchy = model.buildHierarchy(report);
+  const graph = model.projectCompoundGraph(hierarchy, { expandedIds: new Set(), report });
+  const edge = graph.edges.find(edge => edge.from === 'mod:source' && edge.to === 'mod:target');
+
+  assert.equal(hierarchy.moduleMetrics.sdpCount, 1);
+  assert.equal(edge.isSdpViolation, true);
+});
