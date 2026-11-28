@@ -5,6 +5,7 @@ use serde_json::Value;
 use crate::paths::{join_posix, normalize_rel_path, parent_dir, path_is_under};
 use crate::resolver::index::{JsPackageInfo, PackageManifest, ProjectIndex, ResolveOutcome, TsConfigInfo};
 
+const NUXT_SHARED_ALIAS: &str = "#shared/";
 const CODE_EXTENSIONS: &[&str] = &["ts", "tsx", "mts", "cts", "js", "jsx", "mjs", "cjs", "vue"];
 
 const NON_CODE_ASSET_EXTENSIONS: &[&str] = &[
@@ -194,11 +195,13 @@ pub fn resolve_js_ts_import(
     from_file: &str,
     raw_specifier: &str,
 ) -> ResolveOutcome {
-    let clean = raw_specifier
-        .split(['?', '#'])
-        .next()
-        .unwrap_or(raw_specifier)
-        .trim();
+    let raw_specifier = raw_specifier.trim_start();
+    // For the Nuxt shared alias, the first hash is part of the path.
+    let suffix_search_start = usize::from(raw_specifier.starts_with(NUXT_SHARED_ALIAS));
+    let clean = raw_specifier[suffix_search_start..]
+        .find(['?', '#'])
+        .map_or(raw_specifier, |index| &raw_specifier[..suffix_search_start + index])
+        .trim_end();
 
     if clean.is_empty() || clean.starts_with("http://") || clean.starts_with("https://") {
         return ResolveOutcome::External(clean.to_string());
@@ -206,11 +209,6 @@ pub fn resolve_js_ts_import(
 
     if is_non_code_asset(clean) {
         return ResolveOutcome::External(format!("asset:{clean}"));
-    }
-
-    // Nuxt / framework virtual modules (`#imports`, `#app`, `#build/...`, `#components`, `#i18n`).
-    if clean.starts_with('#') && !clean.starts_with("#shared/") {
-        return ResolveOutcome::External(clean.to_string());
     }
 
     // 1. Relative path (`./...` or `../...`)
@@ -252,7 +250,7 @@ pub fn resolve_js_ts_import(
         .enclosing_package(from_file)
         .map_or("", |p| p.dir.as_str());
 
-    if let Some(rest) = clean.strip_prefix("#shared/") {
+    if let Some(rest) = clean.strip_prefix(NUXT_SHARED_ALIAS) {
         let candidate = join_posix(&join_posix(pkg_dir, "shared"), rest);
         if let Some(found) = try_resolve_file_candidate(index, &candidate) {
             return ResolveOutcome::Internal(found);

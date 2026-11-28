@@ -549,3 +549,61 @@ fn resolves_unicode_tsconfig_aliases_with_comments_and_trailing_commas() {
         "the Unicode alias should resolve to the original path"
     );
 }
+
+#[test]
+fn resolves_nuxt_shared_alias_before_discarding_import_suffixes() {
+    let temp = TempDir::new().expect("tempdir");
+    let root = temp.path();
+    write_fixture(root, "site/package.json", r#"{ "name": "site" }"#);
+    write_fixture(
+        root,
+        "site/tsconfig.json",
+        r##"{ "compilerOptions": { "paths": { "#shared/from-config": ["mapped.ts"] } } }"##,
+    );
+    write_fixture(
+        root,
+        "site/app/main.ts",
+        r"import '#shared/found?query#fragment';
+import '#shared/from-config';
+import '#shared/missing';
+import '#imports';
+import './local#fragment';
+import './styles.css?inline';
+",
+    );
+    for path in [
+        "site/shared/found.ts",
+        "site/shared/from-config.ts",
+        "site/mapped.ts",
+        "site/app/local.ts",
+    ] {
+        write_fixture(root, path, "export const value = 1;\n");
+    }
+    let mut config = AnalysisConfig::new(root);
+    config.git.enabled = false;
+    let report = analyze(&config).expect("analyze Nuxt fixture");
+    let entry = report
+        .file_graph
+        .files
+        .iter()
+        .find(|file| file.path == "site/app/main.ts")
+        .expect("entry");
+    let targets: Vec<_> = report
+        .file_graph
+        .edges
+        .iter()
+        .filter(|edge| edge.from == entry.path)
+        .map(|edge| edge.to.as_str())
+        .collect();
+
+    assert_eq!(
+        targets,
+        [
+            "site/app/local.ts",
+            "site/mapped.ts",
+            "site/shared/found.ts"
+        ]
+    );
+    assert_eq!(entry.unresolved_imports, ["#shared/missing"]);
+    assert_eq!(entry.external_imports, ["asset:./styles.css"]);
+}
