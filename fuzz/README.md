@@ -23,3 +23,7 @@ CI discovers every target with `cargo +nightly fuzz list` and requires a seed di
 `analyze_graph` generates valid graphs and checks report totals, view edges, DSM membership, cycle membership, and reachability metrics. The reference calculation uses a small reachability matrix.
 
 `report_roundtrip` writes and reads a JSON snapshot, checks that each restored view has an empty baseline diff, and compares the JSON data embedded in the HTML export with the standalone JSON export.
+
+`analyze_project` builds a small TypeScript project in a temporary directory.
+It checks the public analysis path for Archlens exclusions, TypeScript JSONC
+aliases, relative imports, and exact file dependencies.

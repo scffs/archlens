@@ -36,3 +36,10 @@ path = "fuzz_targets/report_roundtrip.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "analyze_project"
+path = "fuzz_targets/analyze_project.rs"
+test = false
+doc = false
+bench = false
