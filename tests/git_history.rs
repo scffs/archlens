@@ -328,3 +328,39 @@ fn git_hotspot_is_zero_for_a_repository_with_only_empty_source_files() {
     assert_eq!(metrics.commits, 1);
     assert!(metrics.hotspot_score.abs() < f64::EPSILON, "{metrics:?}");
 }
+
+#[test]
+fn temporal_coupling_keeps_a_link_at_the_minimum_strength() {
+    let temp = TempDir::new().expect("temporary repository");
+    let root = temp.path();
+    git(root, &["init", "--quiet"]);
+    for revision in 0..33 {
+        let source = format!("export const revision = {revision};\n");
+        fs::write(root.join("first.ts"), &source).expect("update first file");
+        if revision < 7 {
+            fs::write(root.join("second.ts"), &source).expect("update second file");
+        }
+        if revision == 0 {
+            git(root, &["add", "--", "first.ts", "second.ts"]);
+        }
+        git(root, &["commit", "--quiet", "-am", "advance revision"]);
+    }
+
+    let report = analyze(&AnalysisConfig::new(root)).expect("analyze Git history");
+    let history = report.git.expect("Git history");
+    let [pair] = history.temporal_couplings.as_slice() else {
+        panic!(
+            "expected the pair at strength 0.35, got {:?}",
+            history.temporal_couplings
+        );
+    };
+    assert_eq!(
+        (pair.file_a.as_str(), pair.file_b.as_str()),
+        ("first.ts", "second.ts")
+    );
+    assert_eq!(
+        (pair.shared_commits, pair.commits_a, pair.commits_b),
+        (7, 33, 7)
+    );
+    assert!((pair.strength - 0.35).abs() < f64::EPSILON);
+}
