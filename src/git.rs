@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::process::Command;
 
+use crate::domain::metrics::round4;
 pub use crate::domain::model::{GitAnalysis, TemporalCoupling};
 
 use crate::domain::model::{FileGitMetrics, FileGraph};
@@ -328,8 +329,4 @@ fn normalize_git_numstat_path(raw: &str) -> String {
 
 fn ordered_pair<'a>(a: &'a str, b: &'a str) -> (&'a str, &'a str) {
     if a <= b { (a, b) } else { (b, a) }
-}
-
-fn round4(v: f64) -> f64 {
-    (v * 10_000.0).round() / 10_000.0
 }

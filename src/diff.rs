@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use crate::domain::metrics::{AnalysisReport, BaselineDiff, RuleViolation};
+use crate::domain::metrics::{AnalysisReport, BaselineDiff, RuleViolation, round4};
 pub use crate::report::json::load_report_json;
 
 /// Compare `current` against `baseline` for the specified view (or `current.default_view`).
@@ -111,8 +111,4 @@ fn diff_usize(cur: usize, base: usize) -> isize {
     let c = isize::try_from(cur).unwrap_or(isize::MAX);
     let b = isize::try_from(base).unwrap_or(isize::MAX);
     c - b
-}
-
-fn round4(v: f64) -> f64 {
-    (v * 10_000.0).round() / 10_000.0
 }

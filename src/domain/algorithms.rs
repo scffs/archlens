@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use petgraph::algo::tarjan_scc;
 use petgraph::graph::{DiGraph, NodeIndex};
 
-use crate::domain::metrics::{CycleBreakEdge, DetailedFileEdge, MisplacedFile};
+use crate::domain::metrics::{CycleBreakEdge, DetailedFileEdge, MisplacedFile, round3, round4};
 use crate::domain::model::FileGraph;
 
 /// Compute propagation cost (`0.0..=1.0`), Lakos ACD, and Lakos NCCD.
@@ -399,12 +399,4 @@ pub fn detect_louvain_and_misplaced(
     misplaced.truncate(30);
 
     (file_cluster, misplaced)
-}
-
-fn round3(v: f64) -> f64 {
-    (v * 1_000.0).round() / 1_000.0
-}
-
-fn round4(v: f64) -> f64 {
-    (v * 10_000.0).round() / 10_000.0
 }

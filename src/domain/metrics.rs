@@ -310,3 +310,11 @@ impl AnalysisReport {
             .or_else(|| self.views.first())
     }
 }
+
+pub(crate) fn round3(value: f64) -> f64 {
+    (value * 1_000.0).round() / 1_000.0
+}
+
+pub(crate) fn round4(value: f64) -> f64 {
+    (value * 10_000.0).round() / 10_000.0
+}
