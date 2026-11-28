@@ -14,7 +14,7 @@
   };
 
   function viewTitleRu(v) {
-    return VIEW_TITLES_RU[v.id] || v.title;
+    return Object.hasOwn(VIEW_TITLES_RU, v.id) ? VIEW_TITLES_RU[v.id] : v.title;
   }
 
   function loadPref(key, fallback) {

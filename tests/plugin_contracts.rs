@@ -144,3 +144,65 @@ fn registered_resolver_builds_and_uses_the_reexport_index() {
         [("entry.ts", "target.ts"), ("facade.ts", "target.ts")]
     );
 }
+
+#[test]
+fn additional_views_work_with_scanned_and_prebuilt_graphs() {
+    use archlens::domain::projection::ViewProjection;
+    use archlens::{FileGraph, ViewProvider, analyze_file_graph_with_plugins};
+
+    struct FixtureView(&'static str);
+    impl ViewProvider for FixtureView {
+        fn project(
+            &self,
+            _graph: &FileGraph,
+            _config: &AnalysisConfig,
+        ) -> Result<Option<ViewProjection>> {
+            Ok(Some(ViewProjection {
+                id: self.0.into(),
+                title: "Fixture grouping".into(),
+                description: "Group the target into a logical component.".into(),
+                file_to_group: [("target.ts".into(), "component".into())].into(),
+            }))
+        }
+    }
+
+    let temp = TempDir::new().expect("tempdir");
+    fs::write(temp.path().join("entry.ts"), "import './target';").expect("write importer");
+    fs::write(temp.path().join("target.ts"), "export function target() {}").expect("write target");
+    let mut config = AnalysisConfig::new(temp.path());
+    config.git.enabled = false;
+
+    let mut plugins = AnalysisPlugins::default();
+    plugins.register_view(&FixtureView("modules"));
+    plugins.register_view(&FixtureView("components"));
+    plugins.register_view(&FixtureView("folders-d9"));
+    plugins.register_view(&FixtureView("constructor"));
+    plugins.register_view(&FixtureView("custom-view"));
+    plugins.register_view(&FixtureView("custom-view"));
+    let report = analyze_with_plugins(&config, &plugins).expect("analyze with view");
+    assert_eq!(report.default_view, "modules");
+    assert!(report.view("components").is_none());
+    assert!(report.view("folders-d9").is_none());
+    assert_eq!(
+        report.view("constructor").unwrap().title,
+        "Fixture grouping"
+    );
+    assert_ne!(report.view("modules").unwrap().title, "Fixture grouping");
+    assert_eq!(
+        report
+            .views
+            .iter()
+            .filter(|view| view.id == "custom-view")
+            .count(),
+        1
+    );
+    let custom = report.view("custom-view").expect("custom view");
+    assert_eq!(custom.edges.len(), 1);
+    assert_eq!(custom.edges[0].from, "entry.ts");
+    assert_eq!(custom.edges[0].to, "component");
+
+    let prebuilt =
+        analyze_file_graph_with_plugins(temp.path(), &report.file_graph, &config, &plugins)
+            .expect("analyze prebuilt graph with view");
+    assert!(prebuilt.view("custom-view").is_some());
+}

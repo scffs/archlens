@@ -33,7 +33,7 @@ pub use domain::model::{
     SymbolDecl, SymbolKind, TemporalCoupling, Visibility,
 };
 pub use error::{ArchLensError, Result};
-pub use plugins::AnalysisPlugins;
+pub use plugins::{AnalysisPlugins, ViewProvider};
 
 /// Scan, parse, resolve, enrich with Git history, and compute all architecture views & metrics.
 pub fn analyze(config: &AnalysisConfig) -> Result<AnalysisReport> {
@@ -86,7 +86,7 @@ pub fn analyze_with_plugins(
         None
     };
 
-    analyze_file_graph_with_git(&canonical_root, file_graph, git_analysis, config)
+    analyze_file_graph_with_git(&canonical_root, file_graph, git_analysis, config, plugins)
 }
 
 /// Analyze an already-constructed `FileGraph` (useful for custom pipelines and unit tests).
@@ -95,9 +95,19 @@ pub fn analyze_file_graph(
     file_graph: &FileGraph,
     config: &AnalysisConfig,
 ) -> Result<AnalysisReport> {
+    analyze_file_graph_with_plugins(root, file_graph, config, &AnalysisPlugins::default())
+}
+
+/// Analyze an existing file graph with caller-supplied view providers.
+pub fn analyze_file_graph_with_plugins(
+    root: &std::path::Path,
+    file_graph: &FileGraph,
+    config: &AnalysisConfig,
+    plugins: &AnalysisPlugins<'_>,
+) -> Result<AnalysisReport> {
     let mut owned = file_graph.clone();
     domain::projection::assign_auto_module_ids(&mut owned);
-    analyze_file_graph_with_git(root, owned, None, config)
+    analyze_file_graph_with_git(root, owned, None, config, plugins)
 }
 
 fn analyze_file_graph_with_git(
@@ -105,13 +115,14 @@ fn analyze_file_graph_with_git(
     file_graph: FileGraph,
     git: Option<GitAnalysis>,
     config: &AnalysisConfig,
+    plugins: &AnalysisPlugins<'_>,
 ) -> Result<AnalysisReport> {
     let (file_clusters, misplaced_files) =
         domain::algorithms::detect_louvain_and_misplaced(&file_graph);
     let rule_violations =
         domain::rules::evaluate_architecture_rules(&file_graph, &config.layers, &config.rules)?;
 
-    let projections = domain::projection::build_projections(&file_graph, config)?;
+    let projections = domain::projection::build_projections_with(&file_graph, config, plugins.views())?;
     let views: Vec<ArchitectureView> = projections
         .iter()
         .map(|proj| {

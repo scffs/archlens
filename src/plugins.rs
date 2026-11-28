@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use crate::domain::model::ParsedFile;
+pub use crate::domain::projection::ViewProvider;
 use crate::language::Language;
 use crate::parser::{LanguageParser, builtin_parser};
 use crate::resolver::ImportResolver;
@@ -13,6 +14,7 @@ pub struct AnalysisPlugins<'a> {
     sources: BTreeMap<String, SourceOverride<'a>>,
     resolvers: BTreeMap<Language, &'a dyn ImportResolver>,
     source_resolvers: BTreeMap<String, &'a dyn ImportResolver>,
+    views: Vec<&'a dyn ViewProvider>,
 }
 
 struct SourceOverride<'a> {
@@ -85,6 +87,18 @@ impl<'a> AnalysisPlugins<'a> {
             self.register_extension(extension, language);
             self.source_resolvers.remove(&extension_key(extension));
         }
+    }
+
+    /// Append a view provider. Built-in views keep their IDs and order.
+    ///
+    /// A custom view must use a nonempty ID outside built-in names and the
+    /// `folders-d` namespace. The first custom view with an ID wins.
+    pub fn register_view(&mut self, provider: &'a dyn ViewProvider) {
+        self.views.push(provider);
+    }
+
+    pub(crate) fn views(&self) -> &[&dyn ViewProvider] {
+        &self.views
     }
 
     pub(crate) fn resolver(&self, file: &ParsedFile) -> Option<&dyn ImportResolver> {

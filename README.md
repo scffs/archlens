@@ -46,3 +46,24 @@ archlens analyze /path/to/repo --view modules --fail-on-cycles --fail-on-rules -
 # Create a starter archlens.toml (layers, rules, git lookback, thresholds)
 archlens init /path/to/repo
 ```
+
+## Extending the library
+
+Build an `AnalysisPlugins` value and pass it to `analyze_with_plugins`. Each
+analysis receives its own registrations.
+
+- Implement `parser::LanguageParser` to extract imports and declarations.
+  `register_source` attaches a parser to one extension. Use `register_parser`
+  to replace a parser for an existing report language.
+- Implement `resolver::ImportResolver` to resolve regular imports and
+  re-exports. Register it for an extension or a report language.
+  `register_language` installs a parser, resolver, and extension list together.
+- Implement `ViewProvider` to append a projection with a unique ID.
+  `analyze_file_graph_with_plugins` also accepts view providers for graphs
+  constructed by another tool.
+
+A source registration uses an existing `Language` ID in reports. Adding a new
+built-in report language also requires an ID in the language inventory and
+bindings for the built-in parser, resolver, and CLI. The public parser and
+resolver contracts can be used by custom integrations without changing the
+analysis pipeline.
