@@ -354,8 +354,8 @@ const ArchGraph = (() => {
       }
       return { hasHighlight: true, nodeSet, pathEdgeKeys, focusId: null };
     }
-    if (appState.selectedEdgeId) {
-      const selE = g.edges.find(e => e.id === appState.selectedEdgeId);
+    if (appState.selectedEdge) {
+      const selE = g.edges.find(e => e.id === appState.selectedEdge?.id);
       if (selE) {
         return { hasHighlight: true, nodeSet: new Set([selE.from, selE.to]), pathEdgeKeys: new Set(), focusId: null };
       }
@@ -446,7 +446,7 @@ const ArchGraph = (() => {
       for (const eg of g.edgeGeoms) {
         const e = eg.edge;
         const isPath = pathEdgeKeys.has(e.id);
-        const isSelectedEdge = e.id === appState.selectedEdgeId;
+        const isSelectedEdge = e.id === appState.selectedEdge?.id;
         const isHoveredEdge = e.id === g.hoverEdgeId;
         const isIncident = focusId && (e.from === focusId || e.to === focusId);
         const isImportant = isPath || isSelectedEdge || isHoveredEdge || isIncident || e.isCycleEdge || e.isRuleViolation;
