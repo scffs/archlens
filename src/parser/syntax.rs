@@ -9,13 +9,13 @@ pub trait LanguageParser {
 }
 
 pub(super) fn parse_tree(
-    language: Language,
+    language: &Language,
     label: &'static str,
     source: &str,
 ) -> Result<Option<Tree>> {
     let mut parser = Parser::new();
     parser
-        .set_language(&language)
+        .set_language(language)
         .map_err(|err| ArchLensError::ParserInit {
             language: label,
             message: err.to_string(),

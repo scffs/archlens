@@ -54,7 +54,7 @@ impl JsTsParser {
     }
 
     fn parse_script(self, source: &str, line_offset: usize, state: &mut JsWalkState) -> Result<()> {
-        if let Some(tree) = parse_tree(self.ts_language(), "js/ts", source)? {
+        if let Some(tree) = parse_tree(&self.ts_language(), "js/ts", source)? {
             walk_program(tree.root_node(), source, line_offset, state);
         }
         Ok(())
