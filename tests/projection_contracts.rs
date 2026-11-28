@@ -91,3 +91,22 @@ fn groups_busy_package_roots_while_preserving_entrypoints_and_paired_modules() {
             .all(|node| node.module_id == "(root)")
     );
 }
+
+#[test]
+fn empty_or_zero_folder_depths_use_the_default_views() {
+    let path = "src/feature/client.rs";
+    let graph = FileGraph {
+        files: vec![file(path, None)],
+        edges: Vec::new(),
+    };
+    let mut config = AnalysisConfig::new(".");
+    for depths in [vec![], vec![0]] {
+        config.folder_depths = depths;
+        let views = build_projections(&graph, &config).expect("build default views");
+        let names: Vec<_> = views.iter().map(|view| view.id.as_str()).collect();
+
+        assert_eq!(names, ["modules", "folders-d1", "folders-d2", "files"]);
+        assert_eq!(views[1].file_to_group[path], "src");
+        assert_eq!(views[2].file_to_group[path], "src/feature");
+    }
+}
