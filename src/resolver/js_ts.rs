@@ -396,7 +396,7 @@ fn is_non_code_asset(specifier: &str) -> bool {
 
 /// Strip `//` line comments, `/* ... */` block comments, and trailing commas from JSONC text.
 fn strip_jsonc(input: &str) -> String {
-    let mut no_comments = String::with_capacity(input.len());
+    let mut no_comments = Vec::with_capacity(input.len());
     let bytes = input.as_bytes();
     let mut i = 0;
     let mut in_string = false;
@@ -405,7 +405,7 @@ fn strip_jsonc(input: &str) -> String {
     while i < bytes.len() {
         let b = bytes[i];
         if in_string {
-            no_comments.push(b as char);
+            no_comments.push(b);
             if escaped {
                 escaped = false;
             } else if b == b'\\' {
@@ -419,7 +419,7 @@ fn strip_jsonc(input: &str) -> String {
 
         if b == b'"' {
             in_string = true;
-            no_comments.push('"');
+            no_comments.push(b'"');
             i += 1;
         } else if b == b'/' && bytes.get(i + 1) == Some(&b'/') {
             i += 2;
@@ -433,11 +433,13 @@ fn strip_jsonc(input: &str) -> String {
             }
             i = (i + 2).min(bytes.len());
         } else {
-            no_comments.push(b as char);
+            no_comments.push(b);
             i += 1;
         }
     }
 
+    let no_comments =
+        String::from_utf8(no_comments).expect("stripping ASCII comment delimiters preserves UTF-8");
     let chars: Vec<char> = no_comments.chars().collect();
     let mut out = String::with_capacity(no_comments.len());
     let mut idx = 0;

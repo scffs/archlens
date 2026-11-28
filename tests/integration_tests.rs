@@ -514,3 +514,38 @@ fn html_escapes_script_closing_sequences() {
     assert!(!html.contains("bad</script>"));
     assert!(html.contains("bad<\\/script>"));
 }
+
+#[test]
+fn resolves_unicode_tsconfig_aliases_with_comments_and_trailing_commas() {
+    let temp = TempDir::new().expect("tempdir");
+    let root = temp.path();
+    write_fixture(
+        root,
+        "tsconfig.json",
+        r#"{
+  // Alias and directory names are meaningful Unicode text.
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@данные/*": ["src/модели/*",],
+    },
+  },
+}"#,
+    );
+    write_fixture(
+        root,
+        "src/app.ts",
+        "import { item } from '@данные/item';\nexport const entry = item;\n",
+    );
+    write_fixture(root, "src/модели/item.ts", "export const item = 1;\n");
+    let mut config = AnalysisConfig::new(root);
+    config.git.enabled = false;
+
+    let report = analyze(&config).expect("analyze TypeScript fixture");
+    assert!(
+        report.file_graph.edges.iter().any(|edge| {
+            edge.from == "src/app.ts" && edge.to == "src/модели/item.ts"
+        }),
+        "the Unicode alias should resolve to the original path"
+    );
+}
