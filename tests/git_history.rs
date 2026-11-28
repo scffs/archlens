@@ -10,6 +10,7 @@ fn git(root: &Path, args: &[&str]) {
         .current_dir(root)
         .env("GIT_CONFIG_NOSYSTEM", "1")
         .env("GIT_CONFIG_GLOBAL", root.join(".git/nonexistent-config"))
+        .arg("--literal-pathspecs")
         .args([
             "-c",
             "user.name=Alice",
@@ -32,7 +33,7 @@ fn temporal_coupling_limit_uses_a_stable_order_for_tied_pairs() {
     let root = temp.path();
     git(root, &["init", "--quiet"]);
 
-    let subproject = root.join("workspace");
+    let subproject = root.join("workspace[1]");
     fs::create_dir(&subproject).expect("create subproject");
     let names: Vec<_> = (0..14)
         .map(|index| format!("module_{index:02}.ts"))
@@ -45,7 +46,7 @@ fn temporal_coupling_limit_uses_a_stable_order_for_tied_pairs() {
             )
             .expect("write source");
         }
-        git(root, &["add", "--", "workspace"]);
+        git(root, &["add", "--", "workspace[1]"]);
         let author = if version < 2 {
             "Alice <alice@example.invalid>"
         } else {
@@ -63,8 +64,13 @@ fn temporal_coupling_limit_uses_a_stable_order_for_tied_pairs() {
             ],
         );
     }
-    fs::write(root.join("outside.ts"), "export const outside = true;\n").expect("write outside");
-    git(root, &["add", "--", "outside.ts"]);
+    fs::create_dir(root.join("workspace1")).expect("create similarly named sibling");
+    fs::write(
+        root.join("workspace1/outside.ts"),
+        "export const outside = true;\n",
+    )
+    .expect("write outside");
+    git(root, &["add", "--", "workspace1/outside.ts"]);
     git(
         root,
         &["commit", "--quiet", "-m", "outside the analyzed project"],
@@ -104,4 +110,55 @@ fn temporal_coupling_limit_uses_a_stable_order_for_tied_pairs() {
         .take(80)
         .collect::<Vec<_>>();
     assert_eq!(pairs, expected);
+}
+
+#[test]
+fn git_history_uses_literal_paths_and_attributes_renames_to_the_destination() {
+    let temp = TempDir::new().expect("tempdir");
+    let root_path = temp.path().join(if cfg!(unix) {
+        "repo with trailing space "
+    } else {
+        "repo"
+    });
+    fs::create_dir(&root_path).expect("create repo");
+    let root = root_path.as_path();
+    git(root, &["init", "--quiet"]);
+    git(root, &["config", "core.quotePath", "true"]);
+    git(root, &["config", "diff.renames", "true"]);
+    let mut names = vec!["исходник.ts"];
+    if cfg!(unix) {
+        names.extend(["literal => name.ts", "with\ta tab.ts", "with\na newline.ts"]);
+    }
+
+    for name in &names {
+        fs::write(root.join(name), "export const value = 1;\n").expect("write source");
+    }
+    fs::write(root.join("old.ts"), "export const carried = 42;\n").expect("write old path");
+    git(root, &["add", "--", "."]);
+    git(root, &["commit", "--quiet", "-m", "initial files"]);
+    git(root, &["mv", "--", "old.ts", "готово.ts"]);
+    git(root, &["commit", "--quiet", "-m", "rename source"]);
+    git(
+        root,
+        &["commit", "--quiet", "--allow-empty", "-m", "empty commit"],
+    );
+
+    let report = analyze(&AnalysisConfig::new(root)).expect("analyze Git paths");
+    let history = report.git.expect("Git history");
+    assert_eq!(history.commits_analyzed, 3);
+    assert_eq!(history.active_files, names.len() + 1);
+
+    for file in report.file_graph.files {
+        let metrics = file
+            .git
+            .unwrap_or_else(|| panic!("missing churn for {:?}", file.path));
+        assert_eq!(metrics.commits, 1, "{:?}", file.path);
+        assert_eq!(
+            metrics.lines_added,
+            usize::from(file.path != "готово.ts"),
+            "{:?}",
+            file.path
+        );
+        assert_eq!(metrics.lines_deleted, 0, "{:?}", file.path);
+    }
 }
