@@ -1,0 +1,29 @@
+name: RustSec audit
+
+'on':
+  pull_request:
+    paths:
+      - 'Cargo.lock'
+      - 'fuzz/Cargo.lock'
+      - '.github/workflows/rustsec.yml'
+  schedule:
+    - cron: '17 4 * * 2'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: taiki-e/install-action@073e1fd0bc889c9aee68dbaaa927cde1b5653a83 # v2.90.11
+        with:
+          tool: cargo-audit@0.22.2
+      - name: Audit the library and CLI dependencies
+        run: cargo +stable audit --file Cargo.lock
+      - name: Audit the fuzz workspace dependencies
+        run: cargo +stable audit --file fuzz/Cargo.lock --no-fetch
