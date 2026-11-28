@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
@@ -9,7 +10,7 @@ use archlens::domain::metrics::ArchitectureZone;
 use archlens::domain::model::ImportKind;
 use archlens::report::html::render_html_report;
 use archlens::report::json::to_json_string;
-use archlens::{analyze, parser};
+use archlens::{Language, analyze, parser};
 use tempfile::TempDir;
 
 fn write_fixture(root: &Path, rel: &str, content: &str) {
@@ -153,6 +154,59 @@ mod tests {
     let pos = |id: &str| view.dsm_order.iter().position(|x| x == id).expect("in dsm");
     assert!(pos("domain") < pos("infra"));
     assert!(pos("infra") < pos("app"));
+}
+
+#[test]
+fn reports_mixed_language_when_the_second_language_reaches_a_fifth_of_files() {
+    let tmp = TempDir::new().expect("tempdir");
+    let root = tmp.path();
+    let cases = [
+        ("single", 1, 0, "TypeScript"),
+        ("below", 5, 1, "TypeScript"),
+        ("at_boundary", 4, 1, "Mixed"),
+    ];
+    for (folder, typescript_count, python_count, _) in cases {
+        for index in 0..typescript_count {
+            write_fixture(
+                root,
+                &format!("{folder}/file{index}.ts"),
+                "export const value = 1;\n",
+            );
+        }
+        for index in 0..python_count {
+            write_fixture(
+                root,
+                &format!("{folder}/file{index}.py"),
+                "def run():\n    pass\n",
+            );
+        }
+    }
+
+    let mut config = AnalysisConfig::new(root);
+    config.git.enabled = false;
+    let report = analyze(&config).expect("analyze mixed-language fixture");
+    let folders = report
+        .views
+        .iter()
+        .find(|view| view.id == "folders-d1")
+        .expect("first-level folder view");
+
+    for (folder, typescript_count, python_count, primary_language) in cases {
+        let node = folders
+            .nodes
+            .iter()
+            .find(|node| node.id == folder)
+            .expect("folder metrics");
+        let language_counts = [
+            (Language::TypeScript, typescript_count),
+            (Language::Python, python_count),
+        ]
+        .into_iter()
+        .filter(|&(_, count)| count > 0)
+        .collect::<BTreeMap<_, _>>();
+        assert_eq!(node.languages, language_counts, "{folder}");
+        assert_eq!(node.primary_language, primary_language, "{folder}");
+    }
 }
 
 #[test]
